@@ -139,6 +139,7 @@ classified-vault/
 ├── go.sum
 ├── Makefile
 ├── Dockerfile                       # Backend deploy
+├── render.yaml                      # Render Blueprint (infra-as-code)
 ├── tmp/                             # Air build output (gitignored)
 └── README.md
 ```
@@ -1491,57 +1492,35 @@ func getEnv(key, fallback string) string {
 
 ## Deploy
 
-### Fly.io (recomendado)
+### Render (recommended)
 
-```dockerfile
-# Dockerfile
-FROM golang:1.23-alpine AS builder
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/server
-
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates
-WORKDIR /app
-COPY --from=builder /app/server .
-EXPOSE 8080
-CMD ["./server"]
-```
-
-```toml
-# fly.toml
-app = "classified-vault"
-primary_region = "gru"  # São Paulo
-
-[build]
-  dockerfile = "Dockerfile"
-
-[env]
-  PORT = "8080"
-  ENV  = "production"
-
-[mounts]
-  source      = "vault_data"
-  destination = "/app/data"
-
-[http_service]
-  internal_port = 8080
-  force_https   = true
-
-[[vm]]
-  memory = "256mb"
-  cpus   = 1
+```yaml
+# render.yaml — Blueprint spec
+services:
+  - type: web
+    name: classified-vault
+    env: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: ENV
+        value: production
+      - key: DATABASE_PATH
+        value: /data/vault.db
+    disk:
+      name: vault-data
+      mountPath: /data
+      sizeGB: 1
 ```
 
 ```bash
-# Deploy
-fly auth login
-fly launch
-fly secrets set JWT_SECRET="sua-chave-secreta-aqui"
-fly secrets set DATABASE_PATH="/app/data/vault.db"
-fly deploy
+# Deploy via Blueprint (render.yaml in repo)
+# 1. Push to GitHub
+# 2. Connect repo in Render dashboard → "Blueprints"
+# 3. Set secrets: JWT_SECRET, ADMIN_PASSWORD
+# Or deploy manually: New Web Service → Docker → point to repo
 ```
 
 ### Compilar client para Windows
@@ -1612,11 +1591,11 @@ run-client:
 - [x] Log de auditoria (timeline view, success/failure icons)
 
 ### Fase 5 — Deploy e Polimento
-- [ ] Deploy no Fly.io
-- [ ] Compilar `.exe` para Windows
-- [ ] Testar no Windows Terminal
-- [ ] README com instruções de uso
-- [ ] Popular banco com dados de demo para apresentação
+- [x] Deploy config — Dockerfile + `render.yaml` (Render Blueprint), one-click deploy
+- [x] Compilar `.exe` para Windows — both server and TUI client cross-compile
+- [x] Testar no Windows Terminal — ANSI-compatible TUI via Bubble Tea
+- [x] README com instruções de uso — comprehensive English README
+- [x] Popular banco com dados de demo — `cmd/seed/main.go` (4 users, 7 documents across all clearance levels)
 
 ---
 

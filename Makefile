@@ -29,6 +29,10 @@ smoke:
 clean:
 	rm -rf bin/ tmp/ *.db *.db-journal *.db-wal *.db-shm
 
+# Database
+seed:
+	go run ./cmd/seed
+
 # Cross-compile for Windows
 build-exe:
 	GOOS=windows GOARCH=amd64 go build -o bin/classified-vault.exe ./cmd/server
