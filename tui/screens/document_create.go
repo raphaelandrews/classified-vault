@@ -21,7 +21,7 @@ type DocCreateModel struct {
 	title          string
 	content        string
 	classification int
-	faction        string
+	department        string
 	tags           string
 
 	step   int
@@ -39,7 +39,7 @@ func NewDocCreateModel(api *client.APIClient, user *domain.User) DocCreateModel 
 		apiClient:      api,
 		user:           user,
 		classification: 0,
-		faction:        string(user.Faction),
+		department:        string(user.Department),
 	}
 }
 
@@ -101,7 +101,7 @@ func (m *DocCreateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				return m, func() tea.Msg {
-					doc, err := m.apiClient.CreateDocument(m.title, m.content, domain.ClearanceLevel(m.classification), domain.Faction(m.faction), tags)
+					doc, err := m.apiClient.CreateDocument(m.title, m.content, domain.ClearanceLevel(m.classification), domain.Department(m.department), tags)
 					if err != nil {
 						return err
 					}

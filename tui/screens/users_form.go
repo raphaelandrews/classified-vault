@@ -34,9 +34,9 @@ func (m *UsersModel) updateAddForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.numBuf = ""
 		case 4:
 			role := addRoles[m.addRole]
-			faction := addFactions[m.addFaction]
+			department := addDepts[m.addDept]
 			return m, func() tea.Msg {
-				_, err := m.apiClient.CreateUser(m.addUser, m.addEmail, m.addPass, role, faction)
+				_, err := m.apiClient.CreateUser(m.addUser, m.addEmail, m.addPass, role, department)
 				if err != nil {
 					return err
 				}
@@ -76,7 +76,7 @@ func (m *UsersModel) updateAddForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			handleNumKey(&m.addRole, m.numBuf, len(addRoles))
 		} else if m.addStep == 4 {
 			m.numBuf += k
-			handleNumKey(&m.addFaction, m.numBuf, len(addFactions))
+			handleNumKey(&m.addDept, m.numBuf, len(addDepts))
 		} else if len(msg.Runes) == 1 {
 			switch m.addStep {
 			case 0:
@@ -128,10 +128,10 @@ func (m *UsersModel) viewAddForm() string {
 		sb.WriteString(styles.DocPrompt.Render("Username: ") + styles.DocMeta.Render(m.addUser) + "\n")
 		sb.WriteString(styles.DocPrompt.Render("Email: ") + styles.DocMeta.Render(m.addEmail) + "\n")
 		sb.WriteString(styles.DocPrompt.Render("Role: ") + string(addRoles[m.addRole]) + "\n\n")
-		sb.WriteString(styles.DocPrompt.Render("Faction:\n"))
-		for i, f := range addFactions {
+		sb.WriteString(styles.DocPrompt.Render("Department:\n"))
+		for i, f := range addDepts {
 			marker := " "
-			if i == m.addFaction {
+			if i == m.addDept {
 				marker = "▶"
 			}
 			sb.WriteString(fmt.Sprintf("  %s %s  [%d]\n", marker, f, i+1))

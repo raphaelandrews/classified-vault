@@ -26,7 +26,7 @@ func NewDocumentHandler(service DocumentService) *DocumentHandler {
 	return &DocumentHandler{service: service}
 }
 
-// List returns scrolls accessible to the authenticated villager based on tier and faction.
+// List returns scrolls accessible to the authenticated villager based on tier and department.
 // @Summary      List accessible scrolls
 // @Tags         scrolls
 // @Produce      json
@@ -49,7 +49,7 @@ func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, docs)
 }
 
-// Get returns a single scroll by ID. Access denied if tier or faction insufficient.
+// Get returns a single scroll by ID. Access denied if tier or department insufficient.
 // @Summary      Get scroll by ID
 // @Tags         scrolls
 // @Produce      json

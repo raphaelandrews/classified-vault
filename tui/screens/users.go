@@ -21,37 +21,37 @@ type UsersModel struct {
 	width     int
 	height    int
 
-	adding     bool
-	addUser    string
-	addEmail   string
-	addPass    string
-	addRole    int
-	addFaction int
-	addStep    int
-	addDone    string
-	numBuf     string
+	adding   bool
+	addUser  string
+	addEmail string
+	addPass  string
+	addRole  int
+	addDept  int
+	addStep  int
+	addDone  string
+	numBuf   string
 }
 
 var addRoles = []domain.Role{domain.RoleAssociate, domain.RoleVillager, domain.RoleKeeper, domain.RoleMayor}
-var addFactions = []domain.Faction{
-	domain.FactionMuseum,
-	domain.FactionBulletinBoard,
-	domain.FactionCommunityCenter,
-	domain.FactionCarpentersShop,
-	domain.FactionPierDocks,
-	domain.FactionAdventurersGuild,
-	domain.FactionHarveysClinic,
-	domain.FactionJojaCorp,
-	domain.FactionWizardsTower,
-	domain.FactionQisOffice,
-	domain.FactionMayorsOffice,
+var addDepts = []domain.Department{
+	domain.DepartmentMuseum,
+	domain.DepartmentBulletinBoard,
+	domain.DepartmentCommunityCenter,
+	domain.DepartmentCarpentersShop,
+	domain.DepartmentPierDocks,
+	domain.DepartmentAdventurersGuild,
+	domain.DepartmentHarveysClinic,
+	domain.DepartmentJojaCorp,
+	domain.DepartmentWizardsTower,
+	domain.DepartmentQisOffice,
+	domain.DepartmentMayorsOffice,
 }
 
 func NewUsersModel(api *client.APIClient) UsersModel {
 	return UsersModel{
-		apiClient:  api,
-		addRole:    1,
-		addFaction: 0,
+		apiClient: api,
+		addRole:   1,
+		addDept:   0,
 	}
 }
 
@@ -118,17 +118,24 @@ func (m *UsersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.addEmail = ""
 			m.addPass = ""
 			m.addRole = 1
-			m.addFaction = 0
+			m.addDept = 0
 			return m, nil
 		case "D":
 			if m.cursor < len(m.users) {
 				user := m.users[m.cursor]
+				id := user.ID
+				name := user.Username
 				return m, func() tea.Msg {
-					err := m.apiClient.DeleteUser(user.ID)
-					if err != nil {
-						return err
+					return ConfirmPromptMsg{
+						Message: fmt.Sprintf("Dismiss villager \"%s\"?\nThey will lose all access to the archives.", name),
+						OnYes: func() tea.Msg {
+							err := m.apiClient.DeleteUser(id)
+							if err != nil {
+								return err
+							}
+							return NavigateMsg{Screen: ScreenUsers}
+						},
 					}
-					return NavigateMsg{Screen: ScreenUsers}
 				}
 			}
 		case "R":
@@ -181,7 +188,7 @@ func (m *UsersModel) View() string {
 					return base.Foreground(styles.Foreground).Background(styles.RowOdd)
 				}
 			}).
-			Headers("", "USERNAME", "FACTION", "ROLE", "TIER", "STATUS")
+			Headers("", "USERNAME", "DEPT", "ROLE", "TIER", "STATUS")
 
 		for i, u := range m.users {
 			marker := fmt.Sprintf("%d", i+1)
@@ -192,7 +199,7 @@ func (m *UsersModel) View() string {
 			if !u.Active {
 				status = "INACTIVE"
 			}
-			t.Row(marker, u.Username, string(u.Faction), string(u.Role), styles.ClearanceBadge(u.Clearance.String()), status)
+			t.Row(marker, u.Username, string(u.Department), string(u.Role), styles.ClearanceBadge(u.Clearance.String()), status)
 		}
 
 		sb.WriteString(t.Render())

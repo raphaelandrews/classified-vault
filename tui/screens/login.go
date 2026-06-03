@@ -108,8 +108,8 @@ func (m *LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *LoginModel) View() string {
-	title := styles.TitleStyle.Render("★ PELICAN TOWN ARCHIVES")
-	subtitle := styles.DocMeta.Render("Mayor's Office · Secure Record System")
+	title := styles.TitleStyle.Render("🦩 PELICAN TOWN ARCHIVES")
+	subtitle := styles.DocMeta.Render("Secure Record Management System")
 
 	var body strings.Builder
 	body.WriteString(fmt.Sprintf("\n  %s %s\n", styles.DocPrompt.Render("Username:"), m.username.View()))
@@ -124,6 +124,7 @@ func (m *LoginModel) View() string {
 	}
 
 	body.WriteString(styles.DocMeta.Render("\n  [Enter] Sign In  [Tab] Switch  [Esc] Quit"))
+	body.WriteString(styles.DocMeta.Render(fmt.Sprintf("\n  Theme: %s  [ctrl+t] Cycle", styles.CurrentTheme.Name)))
 
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		title,
@@ -134,6 +135,6 @@ func (m *LoginModel) View() string {
 	return lipgloss.Place(
 		m.width, m.height,
 		lipgloss.Center, lipgloss.Center,
-		styles.BorderStyle.Render(content),
+		content,
 	)
 }

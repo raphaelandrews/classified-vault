@@ -1,10 +1,15 @@
 package tui
 
 import (
+	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"classified-vault/tui/client"
 	"classified-vault/tui/screens"
+	"classified-vault/tui/styles"
+	"classified-vault/tui/themes"
 )
 
 type Model struct {
@@ -21,9 +26,12 @@ type Model struct {
 	usersModel        *screens.UsersModel
 	auditModel        *screens.AuditLogModel
 
-	current tea.Model
-	width   int
-	height  int
+	current  tea.Model
+	width    int
+	height   int
+	themeIdx int
+
+	confirm *screens.ConfirmPromptMsg
 }
 
 func New(serverURL string) *Model {
@@ -38,8 +46,17 @@ func New(serverURL string) *Model {
 	return m
 }
 
+func (m *Model) resizeCmd() tea.Cmd {
+	return func() tea.Msg { return tea.WindowSizeMsg{Width: m.width, Height: m.height} }
+}
+
 func (m *Model) Init() tea.Cmd {
 	return m.current.Init()
+}
+
+func (m *Model) cycleTheme() {
+	m.themeIdx = (m.themeIdx + 1) % len(themes.All)
+	styles.SetTheme(&themes.All[m.themeIdx])
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -48,15 +65,34 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
+	case tea.KeyMsg:
+		if m.confirm != nil {
+			switch msg.String() {
+			case "y", "Y", "enter":
+				action := m.confirm
+				m.confirm = nil
+				return m, func() tea.Msg { return action.OnYes() }
+			case "n", "N", "esc", "h", "q":
+				m.confirm = nil
+				return m, nil
+			}
+			return m, nil
+		}
+		if msg.String() == "ctrl+t" {
+			m.cycleTheme()
+			return m, nil
+		}
+
 	case screens.LoginMsg:
 		dm := screens.NewDashboardModel(m.apiClient, msg.User)
 		m.dashModel = &dm
 		m.screen = screens.ScreenDashboard
 		m.current = m.dashModel
-		return m, m.current.Init()
+		return m, tea.Batch(m.current.Init(), m.resizeCmd())
 
 	case screens.NavigateMsg:
-		return m.handleNavigate(msg)
+		next, cmd := m.handleNavigate(msg)
+		return next, tea.Batch(cmd, m.resizeCmd())
 
 	case screens.DocSelectedMsg:
 		doc, err := m.apiClient.GetDocument(msg.DocID)
@@ -67,14 +103,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.docViewModel = &dvm
 		m.screen = screens.ScreenDocView
 		m.current = m.docViewModel
-		return m, m.current.Init()
+		return m, tea.Batch(m.current.Init(), m.resizeCmd())
 
 	case screens.DocAccessDeniedMsg:
 		adm := screens.NewAccessDeniedModel(msg)
 		m.accessDeniedModel = &adm
 		m.screen = screens.ScreenAccessDenied
 		m.current = m.accessDeniedModel
-		return m, m.current.Init()
+		return m, tea.Batch(m.current.Init(), m.resizeCmd())
+
+	case screens.ConfirmPromptMsg:
+		m.confirm = &msg
+		return m, nil
 
 	case tea.QuitMsg:
 		return m, tea.Quit
@@ -129,5 +169,28 @@ func (m *Model) handleNavigate(msg screens.NavigateMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) View() string {
-	return m.current.View()
+	view := m.current.View()
+
+	if m.confirm != nil {
+		themeHint := ""
+		if m.screen == screens.ScreenLogin || m.screen == screens.ScreenDashboard {
+			themeHint = fmt.Sprintf(" │ %s", styles.CurrentTheme.Name)
+		}
+
+		overlay := lipgloss.NewStyle().
+			Width(m.width).
+			Height(m.height - 1).
+			Background(styles.Bg)
+
+		box := styles.ConfirmBoxStyle.Render(
+			styles.ConfirmTitleStyle.Render("⚠  Confirm") + "\n\n" +
+				m.confirm.Message + "\n\n" +
+				styles.ConfirmPromptStyle.Render("[y] Yes  [n] No") +
+				themeHint,
+		)
+
+		return overlay.Render(lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Center, box))
+	}
+
+	return view
 }

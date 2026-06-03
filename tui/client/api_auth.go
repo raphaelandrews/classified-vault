@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"classified-vault/internal/domain"
 )
@@ -13,7 +14,7 @@ type LoginResponse struct {
 }
 
 func (c *APIClient) Login(username, password string) (*LoginResponse, error) {
-	_, body, err := c.do("POST", "/auth/login", map[string]string{
+	resp, body, err := c.do("POST", "/auth/login", map[string]string{
 		"username": username,
 		"password": password,
 	})
@@ -21,14 +22,24 @@ func (c *APIClient) Login(username, password string) (*LoginResponse, error) {
 		return nil, err
 	}
 
-	var resp LoginResponse
-	if err := json.Unmarshal(body, &resp); err != nil {
+	if resp.StatusCode != http.StatusOK {
+		var apiErr map[string]string
+		json.Unmarshal(body, &apiErr)
+		msg := apiErr["error"]
+		if msg == "" {
+			msg = fmt.Sprintf("login failed (status %d)", resp.StatusCode)
+		}
+		return nil, fmt.Errorf("%s", msg)
+	}
+
+	var loginResp LoginResponse
+	if err := json.Unmarshal(body, &loginResp); err != nil {
 		return nil, fmt.Errorf("unmarshal response: %w", err)
 	}
 
-	c.Token = resp.Token
-	c.User = &resp.User
-	return &resp, nil
+	c.Token = loginResp.Token
+	c.User = &loginResp.User
+	return &loginResp, nil
 }
 
 func (c *APIClient) Logout() error {

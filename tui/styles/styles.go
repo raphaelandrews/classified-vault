@@ -1,60 +1,112 @@
 package styles
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/charmbracelet/lipgloss"
+
+	"classified-vault/tui/themes"
+)
+
+var CurrentTheme *themes.Theme
 
 var (
-	Primary    = lipgloss.Color("#a9b665")
-	Accent     = lipgloss.Color("#d8a657")
-	Success    = lipgloss.Color("#a9b665")
-	Error      = lipgloss.Color("#ea6962")
-	Warning    = lipgloss.Color("#d8a657")
-	Selected   = lipgloss.Color("#e78a4e")
-	Foreground = lipgloss.Color("#d4be98")
-	Dimmed     = lipgloss.Color("#928374")
-	BorderCol  = lipgloss.Color("#504945")
-	RowEven    = lipgloss.Color("#504945")
-	RowOdd     = lipgloss.Color("#3c3836")
-	DarkText   = lipgloss.Color("#1d2021")
+	Primary    lipgloss.Color
+	Accent     lipgloss.Color
+	Success    lipgloss.Color
+	Error      lipgloss.Color
+	Warning    lipgloss.Color
+	Selected   lipgloss.Color
+	Foreground lipgloss.Color
+	Dimmed     lipgloss.Color
+	BorderCol  lipgloss.Color
+	RowEven    lipgloss.Color
+	RowOdd     lipgloss.Color
+	DarkText   lipgloss.Color
+	Bg         lipgloss.Color
 )
 
 var (
-	DocTitle  = lipgloss.NewStyle().Bold(true).Foreground(Foreground)
-	DocMeta   = lipgloss.NewStyle().Foreground(Dimmed)
+	DocTitle           lipgloss.Style
+	DocMeta            lipgloss.Style
+	DocPrompt          lipgloss.Style
+	DocViewTitle       lipgloss.Style
+	HeaderStyle        lipgloss.Style
+	BorderStyle        lipgloss.Style
+	SelectedStyle      lipgloss.Style
+	ErrorStyle         lipgloss.Style
+	SuccessStyle       lipgloss.Style
+	TitleStyle         lipgloss.Style
+	StatusBarStyle     lipgloss.Style
+	ConfirmBoxStyle    lipgloss.Style
+	ConfirmTitleStyle  lipgloss.Style
+	ConfirmPromptStyle lipgloss.Style
+)
+
+func SetTheme(t *themes.Theme) {
+	CurrentTheme = t
+	Primary = t.Primary
+	Accent = t.Accent
+	Success = t.Success
+	Error = t.Error
+	Warning = t.Warning
+	Selected = t.Selected
+	Foreground = t.Foreground
+	Dimmed = t.Dimmed
+	BorderCol = t.BorderCol
+	RowEven = t.RowEven
+	RowOdd = t.RowOdd
+	DarkText = t.DarkText
+	Bg = t.Bg
+
+	DocTitle = lipgloss.NewStyle().Bold(true).Foreground(Foreground)
+	DocMeta = lipgloss.NewStyle().Foreground(Dimmed)
 	DocPrompt = lipgloss.NewStyle().Foreground(Accent).Bold(true)
+	DocViewTitle = lipgloss.NewStyle().Bold(true).Foreground(DarkText).Background(Primary).Padding(0, 2)
 
 	HeaderStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(DarkText).
-			Background(Primary).
-			Padding(0, 1)
+		Bold(true).
+		Foreground(DarkText).
+		Background(Primary).
+		Padding(0, 1)
 
 	BorderStyle = lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(BorderCol).
-			Padding(1, 2)
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(BorderCol).
+		Padding(1, 2)
 
 	SelectedStyle = lipgloss.NewStyle().
-			Foreground(DarkText).
-			Background(Selected).
-			Bold(true)
+		Foreground(DarkText).
+		Background(Selected).
+		Bold(true)
 
 	ErrorStyle = lipgloss.NewStyle().
-			Foreground(Error).
-			Bold(true)
+		Foreground(Error).
+		Bold(true)
 
 	SuccessStyle = lipgloss.NewStyle().
-			Foreground(Success).
-			Bold(true)
+		Foreground(Success).
+		Bold(true)
 
 	TitleStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(Primary).
-			Padding(0, 1)
+		Bold(true).
+		Foreground(Primary).
+		Padding(0, 1)
 
 	StatusBarStyle = lipgloss.NewStyle().
-			Foreground(Dimmed).
-			Padding(0, 1)
-)
+		Foreground(Dimmed).
+		Padding(0, 1)
+
+	ConfirmBoxStyle = lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(Primary).
+		Padding(1, 3)
+
+	ConfirmTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(Warning)
+	ConfirmPromptStyle = lipgloss.NewStyle().Foreground(Dimmed)
+}
+
+func init() {
+	SetTheme(&themes.GruvboxDark)
+}
 
 func ClearanceBadge(level string) string {
 	switch level {
@@ -75,8 +127,8 @@ func ClearanceBadge(level string) string {
 	}
 }
 
-func FactionBadge(faction string) string {
-	switch faction {
+func DepartmentBadge(department string) string {
+	switch department {
 	case "Mayor's Office":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("#ea6962")).Render("[ Mayor's Office ]")
 	case "Wizard's Tower":
@@ -100,7 +152,7 @@ func FactionBadge(faction string) string {
 	case "Pier & Docks":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("#7daea3")).Render("[ Pier & Docks  ]")
 	default:
-		return lipgloss.NewStyle().Foreground(Dimmed).Render("[ " + faction + " ]")
+		return lipgloss.NewStyle().Foreground(Dimmed).Render("[ " + department + " ]")
 	}
 }
 

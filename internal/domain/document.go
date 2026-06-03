@@ -16,7 +16,7 @@ type Document struct {
 	Content        string         `json:"content"`
 	Classification ClearanceLevel `json:"tier"`
 	Status         DocumentStatus `json:"status"`
-	Faction        Faction        `json:"faction"`
+	Department        Department        `json:"department"`
 	Folder         string         `json:"folder,omitempty"`
 	Tags           []string       `json:"tags"`
 	ReferenceIDs   []string       `json:"references,omitempty"`

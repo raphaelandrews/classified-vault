@@ -1,2 +1,2 @@
-ALTER TABLE users ADD COLUMN faction TEXT NOT NULL DEFAULT 'Museum';
-ALTER TABLE documents ADD COLUMN faction TEXT NOT NULL DEFAULT 'public';
+ALTER TABLE users ADD COLUMN department TEXT NOT NULL DEFAULT 'Museum';
+ALTER TABLE documents ADD COLUMN department TEXT NOT NULL DEFAULT 'public';

@@ -29,7 +29,7 @@ type DocSelectedMsg struct {
 
 type DocAccessDeniedMsg struct {
 	Title       string
-	Faction     string
+	Department  string
 	UserCle     domain.ClearanceLevel
 	RequiredCle domain.ClearanceLevel
 }
@@ -55,18 +55,18 @@ func (m *DocumentListModel) loadDocs() tea.Msg {
 
 func (m *DocumentListModel) canAccess(entry client.CatalogEntry) bool {
 	docTier := domain.ClearanceLevel(entry.Classification)
-	docFaction := domain.Faction(entry.Faction)
+	docDept := domain.Department(entry.Department)
 
 	if docTier == domain.TierPublic {
 		return true
 	}
-	if m.user.Faction == docFaction && m.user.Clearance >= docTier {
+	if m.user.Department == docDept && m.user.Clearance >= docTier {
 		return true
 	}
-	if m.user.Faction == domain.FactionMayorsOffice && m.user.Clearance >= domain.TierArcane {
+	if m.user.Department == domain.DepartmentMayorsOffice && m.user.Clearance >= domain.TierArcane {
 		return true
 	}
-	if m.user.Faction == domain.FactionWizardsTower && containsArcane(entry.Tags) {
+	if m.user.Department == domain.DepartmentWizardsTower && containsArcane(entry.Tags) {
 		return true
 	}
 	return false
@@ -121,7 +121,7 @@ func (m *DocumentListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, func() tea.Msg {
 					return DocAccessDeniedMsg{
 						Title:       entry.Title,
-						Faction:     entry.Faction,
+						Department:  entry.Department,
 						UserCle:     m.user.Clearance,
 						RequiredCle: docTier,
 					}
@@ -129,6 +129,24 @@ func (m *DocumentListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "A":
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDocCreate} }
+		case "D":
+			if m.cursor < len(m.docs) {
+				entry := m.docs[m.cursor]
+				id := entry.ID
+				title := entry.Title
+				return m, func() tea.Msg {
+					return ConfirmPromptMsg{
+						Message: fmt.Sprintf("Destroy scroll \"%s\"?\nThis action cannot be undone.", title),
+						OnYes: func() tea.Msg {
+							err := m.apiClient.DeleteDocument(id)
+							if err != nil {
+								return err
+							}
+							return NavigateMsg{Screen: ScreenDocList}
+						},
+					}
+				}
+			}
 		case "H", "Q":
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDashboard} }
 		case "CTRL+C":
@@ -147,7 +165,7 @@ func (m *DocumentListModel) View() string {
 	header := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(styles.Primary).
-		Render(fmt.Sprintf("SCROLLS — %s  %s", styles.ClearanceBadge(m.user.Clearance.String()), styles.FactionBadge(string(m.user.Faction))))
+		Render(fmt.Sprintf("SCROLLS — %s  %s", styles.ClearanceBadge(m.user.Clearance.String()), styles.DepartmentBadge(string(m.user.Department))))
 	sb.WriteString(header + "\n\n")
 
 	if m.err != "" {
@@ -174,13 +192,13 @@ func (m *DocumentListModel) View() string {
 					return base.Foreground(styles.Foreground).Background(styles.RowOdd)
 				}
 			}).
-			Headers("", "TITLE", "TIER", "FACTION", "FOLDER", "DATE")
+			Headers("", "TITLE", "TIER", "DEPT", "FOLDER", "DATE")
 
 		for i, entry := range m.docs {
 			marker := fmt.Sprintf("%d", i+1)
 			title := entry.Title
 			tier := styles.ClearanceBadge(domain.ClearanceLevel(entry.Classification).String())
-			faction := styles.FactionBadge(entry.Faction)
+			department := styles.DepartmentBadge(entry.Department)
 			folder := ""
 			if entry.Folder != "" {
 				folder = styles.DocMeta.Render("▸ " + entry.Folder)
@@ -196,14 +214,14 @@ func (m *DocumentListModel) View() string {
 				marker = "▶"
 			}
 
-			t.Row(marker, title, tier, faction, folder, date)
+			t.Row(marker, title, tier, department, folder, date)
 		}
 
 		sb.WriteString(t.Render())
 	}
 
 	content := styles.BorderStyle.Render(sb.String())
-	footer := styles.StatusBarStyle.Width(m.width).Render("[j/k] Move  [l] Open  [a] New  [h] Back  [r] Refresh")
+	footer := styles.StatusBarStyle.Width(m.width).Render("[j/k] Move  [l] Open  [a] New  [d] Destroy  [h] Back  [r] Refresh")
 
 	return lipgloss.JoinVertical(lipgloss.Left, content, footer)
 }

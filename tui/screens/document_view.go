@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 
 	"classified-vault/internal/domain"
@@ -45,7 +46,12 @@ func (m *DocumentViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *DocumentViewModel) View() string {
-	header := fmt.Sprintf("★ %s", styles.DocTitle.Render(m.doc.Title))
+	contentWidth := m.width - 12
+	if contentWidth < 40 {
+		contentWidth = 40
+	}
+
+	header := styles.DocViewTitle.Render("*", m.doc.Title)
 
 	var sb strings.Builder
 	sb.WriteString(header + "\n\n")
@@ -53,7 +59,7 @@ func (m *DocumentViewModel) View() string {
 		fmt.Sprintf("Tier:       %s", styles.ClearanceBadge(m.doc.Classification.String())),
 	) + "\n")
 	sb.WriteString(styles.DocMeta.Render(
-		fmt.Sprintf("Faction:    %s", styles.FactionBadge(string(m.doc.Faction))),
+		fmt.Sprintf("Department: %s", styles.DepartmentBadge(string(m.doc.Department))),
 	) + "\n")
 	if m.doc.Folder != "" {
 		sb.WriteString(styles.DocMeta.Render(
@@ -76,13 +82,24 @@ func (m *DocumentViewModel) View() string {
 			fmt.Sprintf("Refs:       %s", strings.Join(m.doc.ReferenceIDs, ", ")),
 		) + "\n")
 	}
-	sb.WriteString("\n" + lipgloss.NewStyle().
-		Width(60).
-		MaxHeight(20).
-		Render(m.doc.Content))
+
+	r, err := glamour.NewTermRenderer(
+		glamour.WithStandardStyle("dark"),
+		glamour.WithWordWrap(contentWidth),
+	)
+	if err != nil {
+		sb.WriteString("\n" + m.doc.Content)
+	} else {
+		md, err := r.Render(m.doc.Content)
+		if err != nil {
+			sb.WriteString("\n" + m.doc.Content)
+		} else {
+			sb.WriteString("\n" + md)
+		}
+	}
 
 	content := styles.BorderStyle.Render(sb.String())
-	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Top, content)
+	main := lipgloss.Place(m.width, m.height-1, lipgloss.Left, lipgloss.Top, content)
 	footer := styles.StatusBarStyle.Width(m.width).Render("[h] Back  [q] Quit")
 
 	return main + "\n" + footer

@@ -36,10 +36,10 @@ func NewDocumentService(
 
 func (s *DocumentService) List(session auth.Session) ([]*domain.Document, error) {
 	maxTier := int(session.Clearance)
-	if session.Faction == domain.FactionMayorsOffice && session.Clearance >= domain.TierArcane {
+	if session.Department == domain.DepartmentMayorsOffice && session.Clearance >= domain.TierArcane {
 		maxTier = int(domain.TierJunimo)
 	}
-	if session.Faction == domain.FactionWizardsTower && maxTier < int(domain.TierArcane) {
+	if session.Department == domain.DepartmentWizardsTower && maxTier < int(domain.TierArcane) {
 		maxTier = int(domain.TierArcane)
 	}
 
@@ -74,7 +74,7 @@ func (s *DocumentService) GetByID(session auth.Session, docID string) (*domain.D
 			Action:   domain.ActionAccessDenied,
 			Resource: "scroll:" + docID,
 			Success:  false,
-			Details:  fmt.Sprintf("tier %d (%s) < %d (%s) faction=%s", session.Clearance, session.Clearance, doc.Classification, doc.Classification, doc.Faction),
+			Details:  fmt.Sprintf("tier %d (%s) < %d (%s) department=%s", session.Clearance, session.Clearance, doc.Classification, doc.Classification, doc.Department),
 		})
 		return nil, fmt.Errorf("access denied")
 	}
@@ -93,8 +93,11 @@ func (s *DocumentService) GetByID(session auth.Session, docID string) (*domain.D
 func (s *DocumentService) Create(session auth.Session, doc *domain.Document) (*domain.Document, error) {
 	doc.ID = "scr_" + uuid.New().String()[:8]
 	doc.CreatedBy = session.UserID
-	if doc.Faction == "" {
-		doc.Faction = session.Faction
+	if doc.Status == "" {
+		doc.Status = domain.StatusActive
+	}
+	if doc.Department == "" {
+		doc.Department = session.Department
 	}
 
 	if err := s.repo.Create(doc); err != nil {
@@ -109,7 +112,7 @@ func (s *DocumentService) Create(session auth.Session, doc *domain.Document) (*d
 		Action:   domain.ActionScrollCreate,
 		Resource: "scroll:" + doc.ID,
 		Success:  true,
-		Details:  fmt.Sprintf("title=%s tier=%s faction=%s", doc.Title, doc.Classification, doc.Faction),
+		Details:  fmt.Sprintf("title=%s tier=%s department=%s", doc.Title, doc.Classification, doc.Department),
 	})
 
 	return doc, nil
@@ -131,7 +134,7 @@ func (s *DocumentService) Update(session auth.Session, id string, doc *domain.Do
 			Action:   domain.ActionAccessDenied,
 			Resource: "scroll:" + id,
 			Success:  false,
-			Details:  "update denied: insufficient tier or wrong faction",
+			Details:  "update denied: insufficient tier or wrong department",
 		})
 		return nil, fmt.Errorf("access denied")
 	}
@@ -174,7 +177,7 @@ func (s *DocumentService) Delete(session auth.Session, id string) error {
 				Action:   domain.ActionAccessDenied,
 				Resource: "scroll:" + id,
 				Success:  false,
-				Details:  "delete denied: insufficient tier or wrong faction",
+				Details:  "delete denied: insufficient tier or wrong department",
 			})
 			return fmt.Errorf("access denied")
 		}
@@ -206,15 +209,15 @@ func canAccess(session auth.Session, doc *domain.Document) bool {
 		return true
 	}
 
-	if session.Faction == doc.Faction && session.Clearance >= doc.Classification {
+	if session.Department == doc.Department && session.Clearance >= doc.Classification {
 		return true
 	}
 
-	if session.Faction == domain.FactionMayorsOffice && session.Clearance >= domain.TierArcane {
+	if session.Department == domain.DepartmentMayorsOffice && session.Clearance >= domain.TierArcane {
 		return true
 	}
 
-	if session.Faction == domain.FactionWizardsTower && slices.Contains(doc.Tags, "arcane") {
+	if session.Department == domain.DepartmentWizardsTower && slices.Contains(doc.Tags, "arcane") {
 		return true
 	}
 

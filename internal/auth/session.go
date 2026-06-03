@@ -11,6 +11,6 @@ type Session struct {
 	Username  string                `json:"username"`
 	Role      domain.Role           `json:"role"`
 	Clearance domain.ClearanceLevel `json:"tier"`
-	Faction   domain.Faction        `json:"faction"`
+	Department   domain.Department        `json:"department"`
 	ExpiresAt time.Time             `json:"expires_at"`
 }

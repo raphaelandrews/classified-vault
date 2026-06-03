@@ -59,5 +59,15 @@ func (c *APIClient) do(method, path string, body interface{}) (*http.Response, [
 		return nil, nil, fmt.Errorf("read response: %w", err)
 	}
 
+	if resp.StatusCode >= 400 {
+		var apiErr map[string]string
+		json.Unmarshal(respBody, &apiErr)
+		msg := apiErr["error"]
+		if msg == "" {
+			msg = fmt.Sprintf("request failed (status %d)", resp.StatusCode)
+		}
+		return nil, nil, fmt.Errorf("%s", msg)
+	}
+
 	return resp, respBody, nil
 }

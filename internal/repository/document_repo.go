@@ -20,12 +20,12 @@ func NewDocumentRepository(db *sql.DB) *DocumentRepository {
 func scanDoc(rows *sql.Rows) (*domain.Document, error) {
 	var d domain.Document
 	var tagsJSON string
-	var faction string
+	var department string
 	var folder, refIDs sql.NullString
-	if err := rows.Scan(&d.ID, &d.Title, &d.Content, &d.Classification, &d.Status, &faction, &folder, &tagsJSON, &refIDs, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt); err != nil {
+	if err := rows.Scan(&d.ID, &d.Title, &d.Content, &d.Classification, &d.Status, &department, &folder, &tagsJSON, &refIDs, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt); err != nil {
 		return nil, err
 	}
-	d.Faction = domain.Faction(faction)
+	d.Department = domain.Department(department)
 	d.Folder = folder.String
 	json.Unmarshal([]byte(tagsJSON), &d.Tags)
 	json.Unmarshal([]byte(refIDs.String), &d.ReferenceIDs)
@@ -41,16 +41,16 @@ func scanDoc(rows *sql.Rows) (*domain.Document, error) {
 func scanDocRow(row *sql.Row) (*domain.Document, error) {
 	var d domain.Document
 	var tagsJSON string
-	var faction string
+	var department string
 	var folder, refIDs sql.NullString
-	err := row.Scan(&d.ID, &d.Title, &d.Content, &d.Classification, &d.Status, &faction, &folder, &tagsJSON, &refIDs, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt)
+	err := row.Scan(&d.ID, &d.Title, &d.Content, &d.Classification, &d.Status, &department, &folder, &tagsJSON, &refIDs, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	d.Faction = domain.Faction(faction)
+	d.Department = domain.Department(department)
 	d.Folder = folder.String
 	json.Unmarshal([]byte(tagsJSON), &d.Tags)
 	json.Unmarshal([]byte(refIDs.String), &d.ReferenceIDs)
@@ -63,7 +63,7 @@ func scanDocRow(row *sql.Row) (*domain.Document, error) {
 	return &d, nil
 }
 
-const docColumns = `id, title, content, classification, status, faction, folder, tags, reference_ids, created_by, created_at, updated_at`
+const docColumns = `id, title, content, classification, status, department, folder, tags, reference_ids, created_by, created_at, updated_at`
 
 func (r *DocumentRepository) FindAll() ([]*domain.Document, error) {
 	rows, err := r.db.Query(
@@ -134,14 +134,14 @@ func (r *DocumentRepository) Create(d *domain.Document) error {
 	if string(refsJSON) == "null" {
 		refsJSON = []byte("[]")
 	}
-	if d.Faction == "" {
-		d.Faction = "public"
+	if d.Department == "" {
+		d.Department = "public"
 	}
 
 	_, err := r.db.Exec(
-		`INSERT INTO documents (id, title, content, classification, status, faction, folder, tags, reference_ids, created_by, created_at, updated_at)
+		`INSERT INTO documents (id, title, content, classification, status, department, folder, tags, reference_ids, created_by, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		d.ID, d.Title, d.Content, d.Classification, d.Status, string(d.Faction), d.Folder, string(tagsJSON), string(refsJSON), d.CreatedBy, d.CreatedAt, d.UpdatedAt,
+		d.ID, d.Title, d.Content, d.Classification, d.Status, string(d.Department), d.Folder, string(tagsJSON), string(refsJSON), d.CreatedBy, d.CreatedAt, d.UpdatedAt,
 	)
 	return err
 }
@@ -159,9 +159,9 @@ func (r *DocumentRepository) Update(d *domain.Document) error {
 	}
 
 	_, err := r.db.Exec(
-		`UPDATE documents SET title=?, content=?, classification=?, status=?, faction=?, folder=?, tags=?, reference_ids=?, updated_at=?
+		`UPDATE documents SET title=?, content=?, classification=?, status=?, department=?, folder=?, tags=?, reference_ids=?, updated_at=?
 		 WHERE id=?`,
-		d.Title, d.Content, d.Classification, d.Status, string(d.Faction), d.Folder, string(tagsJSON), string(refsJSON), d.UpdatedAt, d.ID,
+		d.Title, d.Content, d.Classification, d.Status, string(d.Department), d.Folder, string(tagsJSON), string(refsJSON), d.UpdatedAt, d.ID,
 	)
 	return err
 }
@@ -176,7 +176,7 @@ type DocMetadata struct {
 	Title          string    `json:"title"`
 	Classification int       `json:"classification"`
 	Status         string    `json:"status"`
-	Faction        string    `json:"faction"`
+	Department        string    `json:"department"`
 	Folder         string    `json:"folder"`
 	Tags           []string  `json:"tags"`
 	CreatedBy      string    `json:"created_by"`
@@ -186,7 +186,7 @@ type DocMetadata struct {
 
 func (r *DocumentRepository) FindAllMetadata() ([]DocMetadata, error) {
 	rows, err := r.db.Query(
-		`SELECT id, title, classification, status, faction, folder, tags, created_by, created_at, updated_at
+		`SELECT id, title, classification, status, department, folder, tags, created_by, created_at, updated_at
 		 FROM documents ORDER BY created_at DESC`,
 	)
 	if err != nil {
@@ -199,7 +199,7 @@ func (r *DocumentRepository) FindAllMetadata() ([]DocMetadata, error) {
 		var d DocMetadata
 		var tagsJSON string
 		var folder sql.NullString
-		if err := rows.Scan(&d.ID, &d.Title, &d.Classification, &d.Status, &d.Faction, &folder, &tagsJSON, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.Title, &d.Classification, &d.Status, &d.Department, &folder, &tagsJSON, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt); err != nil {
 			return nil, err
 		}
 		d.Folder = folder.String

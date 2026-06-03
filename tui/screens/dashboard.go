@@ -69,7 +69,7 @@ func (m *DashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *DashboardModel) View() string {
 	header := fmt.Sprintf("★ PELICAN TOWN ARCHIVES    Villager: %s  %s  %s",
 		styles.SuccessStyle.Render(m.user.Username),
-		styles.FactionBadge(string(m.user.Faction)),
+		styles.DepartmentBadge(string(m.user.Department)),
 		styles.ClearanceBadge(m.user.Clearance.String()),
 	)
 
@@ -95,8 +95,8 @@ func (m *DashboardModel) View() string {
 		) + "\n\n")
 	}
 
-	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Top, sb.String())
-	footer := styles.StatusBarStyle.Width(m.width).Render("[d] Scrolls  [a] New  [u] Villagers  [l] Ledger  [q] Sign Out")
+	main := lipgloss.Place(m.width, m.height-1, lipgloss.Left, lipgloss.Top, sb.String())
+	footer := styles.StatusBarStyle.Width(m.width).Render(fmt.Sprintf("[d] Scrolls  [a] New  [u] Villagers  [l] Ledger  [ctrl+t] Theme: %s  [q] Sign Out", styles.CurrentTheme.Name))
 
 	return main + "\n" + footer
 }

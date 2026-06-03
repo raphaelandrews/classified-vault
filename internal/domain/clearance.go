@@ -58,18 +58,19 @@ func MaxClearanceForRole(role Role) ClearanceLevel {
 	}
 }
 
-type Faction string
+type Department string
 
 const (
-	FactionMayorsOffice     Faction = "Mayor's Office"
-	FactionWizardsTower     Faction = "Wizard's Tower"
-	FactionJojaCorp         Faction = "Joja Corp"
-	FactionAdventurersGuild Faction = "Adventurer's Guild"
-	FactionHarveysClinic    Faction = "Harvey's Clinic"
-	FactionCommunityCenter  Faction = "Community Center"
-	FactionCarpentersShop   Faction = "Carpenter's Shop"
-	FactionMuseum           Faction = "Museum"
-	FactionBulletinBoard    Faction = "Bulletin Board"
-	FactionQisOffice        Faction = "Mr. Qi's Office"
-	FactionPierDocks        Faction = "Pier & Docks"
+	DeptPublic                 Department = "public"
+	DepartmentMayorsOffice     Department = "Mayor's Office"
+	DepartmentWizardsTower     Department = "Wizard's Tower"
+	DepartmentJojaCorp         Department = "Joja Corp"
+	DepartmentAdventurersGuild Department = "Adventurer's Guild"
+	DepartmentHarveysClinic    Department = "Harvey's Clinic"
+	DepartmentCommunityCenter  Department = "Community Center"
+	DepartmentCarpentersShop   Department = "Carpenter's Shop"
+	DepartmentMuseum           Department = "Museum"
+	DepartmentBulletinBoard    Department = "Bulletin Board"
+	DepartmentQisOffice        Department = "Mr. Qi's Office"
+	DepartmentPierDocks        Department = "Pier & Docks"
 )

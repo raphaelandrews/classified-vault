@@ -64,7 +64,7 @@ func (s *UserService) Create(user *domain.User) (*domain.User, error) {
 		Action:   domain.ActionUserCreated,
 		Resource: "villager:" + user.ID,
 		Success:  true,
-		Details:  fmt.Sprintf("role=%s tier=%s faction=%s", user.Role, user.Clearance, user.Faction),
+		Details:  fmt.Sprintf("role=%s tier=%s department=%s", user.Role, user.Clearance, user.Department),
 	})
 
 	return user, nil
@@ -106,7 +106,7 @@ func (s *UserService) Update(id string, user *domain.User) (*domain.User, error)
 		Action:   domain.ActionUserUpdated,
 		Resource: "villager:" + id,
 		Success:  true,
-		Details:  fmt.Sprintf("role=%s tier=%s faction=%s", user.Role, user.Clearance, user.Faction),
+		Details:  fmt.Sprintf("role=%s tier=%s department=%s", user.Role, user.Clearance, user.Department),
 	})
 
 	return user, nil
@@ -147,7 +147,7 @@ func (s *UserService) SeedMayor(defaultPassword string) error {
 			Username:     "lewis",
 			Email:        "lewis@pelican.valley",
 			Role:         domain.RoleMayor,
-			Faction:      domain.FactionMayorsOffice,
+			Department:      domain.DepartmentMayorsOffice,
 			PasswordHash: defaultPassword,
 		}
 		if _, err := s.Create(mayor); err != nil {
