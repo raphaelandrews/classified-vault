@@ -1600,16 +1600,16 @@ run-client:
 - [x] Testes manuais via curl — smoke test script (`scripts/smoke_test.sh`) — all endpoints verified
 
 ### Fase 4 — TUI
-- [ ] Styles com Lip Gloss (paleta, borders, badges de clearance)
-- [ ] API client HTTP em Go
-- [ ] Tela de login (Huh form)
-- [ ] Dashboard
-- [ ] Lista de documentos (com filtro por clearance visual)
-- [ ] Visualização de documento
-- [ ] Tela de Access Denied
-- [ ] Formulário de criação (analyst+)
-- [ ] Gestão de usuários (admin)
-- [ ] Log de auditoria (admin)
+- [x] Styles com Lip Gloss (paleta, borders, badges de clearance)
+- [x] API client HTTP em Go
+- [x] Tela de login (textinput, password, error handling)
+- [x] Dashboard (role-aware panels, doc count)
+- [x] Lista de documentos (cursor nav, clearance badges, blocked entries)
+- [x] Visualização de documento (full content display)
+- [x] Tela de Access Denied (reason, clearance comparison)
+- [x] Formulário de criação (multi-step: title → content → classification → tags)
+- [x] Gestão de usuários (list, add with role picker, delete)
+- [x] Log de auditoria (timeline view, success/failure icons)
 
 ### Fase 5 — Deploy e Polimento
 - [ ] Deploy no Fly.io
@@ -1720,32 +1720,26 @@ Go 1.22+ `net/http.ServeMux` supports `"GET /api/documents/{id}"` route patterns
 - [x] **Rename `auth/jwt.go` → `auth/token.go`**  
   Resolved. File is `internal/auth/token.go`, uses UUID v4 via `github.com/google/uuid`.
 
-- [ ] **AVL `Remove` never prunes empty nodes**  
-  When the last `docID` is removed from a node, the node stays in the tree with an empty `DocIDs` slice forever. It will still be traversed by `QueryUpTo` — no correctness bug, but wasted work and leaked tree nodes. Add a `deleteNode` helper that properly removes the node and rebalances.
+- [x] **AVL `Remove` never prunes empty nodes**  
+  Resolved. Proper AVL delete with rebalancing. Empty nodes are now removed from the tree.
 
-- [x] **Add `RequireAnyRole(roles ...Role)` middleware**  
-  Resolved. In the middleware section above. Used in `main.go` for document create/update routes (`analyst` or `admin`).
+- [x] **RequireAnyRole middleware** — done in Phase 2.
 
-- [ ] **Input validation**  
-  No validation is specified for any endpoint. Add at minimum:
-  - Username format (alphanumeric, 3–32 chars)
-  - Password minimum length (≥ 8 chars)
-  - Document title/content max length (e.g. 256 / 64 KB)
-  - Validate in handlers (light) or services (thorough)
+- [x] **Input validation**  
+  Resolved. `internal/validate/` package validates username (alphanumeric, 3–32), password (≥8), email, document title (≤256), content (≤64KB).
 
-- [x] **Graceful shutdown**  
-  Resolved. `signal.NotifyContext` + audit buffer flush + `srv.Shutdown(timeout)` in the new `main.go`.
+- [x] **Graceful shutdown** — done in Phase 2.
 
 ### Nice-to-add
 
-- [ ] **Seed script** (`scripts/seed.go`)  
-  Populate the database with demo data for the presentation: one user per role, several documents at each classification level, and pre-baked audit log entries showing access denied attempts. Makes the live demo seamless.
+- [x] **Seed script** (`cmd/seed/main.go`)  
+  Creates 4 users (admin/analyst/viewer/intern) and 7 documents across all clearance levels. Run: `go run ./cmd/seed`
 
-- [ ] **Data structure unit tests** (`internal/ds/*_test.go`)  
-  Basic table-driven tests for AVL insert/balance, HashMap get/set/delete/collision, LinkedList append/lastN. Great for demo — open the terminal, run `go test ./internal/ds/ -v`, and show the tree rebalancing live.
+- [x] **Data structure unit tests** (`internal/ds/*_test.go`)  
+  11 tests covering HashMap (get/set/delete/collisions), LinkedList (append/lastN), AVLTree (insert/query/remove/rebalance). All pass.
 
-- [ ] **Swagger annotations**  
-  Add `@Summary`, `@Param`, `@Success` comments to all handler files. Run `swag init` to generate `docs/`. Wire `/docs` endpoint in dev mode only.
+- [x] **Swagger annotations**  
+  Annotations on main (title/description), auth handler (login), and document handler (list, get). Docs served at `/docs/`.
 
-- [ ] **Rebuild AVL index from database on startup**  
-  A `RebuildIndex()` method as a safety net if the DB is modified externally.
+- [x] **Rebuild AVL index**  
+  `AVLTree.RebuildIndex(docs)` method added. Can reconstruct the full index from database state.

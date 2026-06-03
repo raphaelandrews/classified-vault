@@ -129,25 +129,75 @@ func (t *AVLTree) QueryUpTo(maxLevel int) []string {
 func (t *AVLTree) Remove(clearanceLevel int, docID string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	t.Root = remove(t.Root, clearanceLevel, docID)
+}
 
-	var removeFromNode func(node *AVLNode)
-	removeFromNode = func(node *AVLNode) {
-		if node == nil {
-			return
-		}
-		if node.Key == clearanceLevel {
-			newDocIDs := make([]string, 0)
-			for _, id := range node.DocIDs {
-				if id != docID {
-					newDocIDs = append(newDocIDs, id)
-				}
-			}
-			node.DocIDs = newDocIDs
-		} else if clearanceLevel < node.Key {
-			removeFromNode(node.Left)
-		} else {
-			removeFromNode(node.Right)
-		}
+func remove(node *AVLNode, key int, docID string) *AVLNode {
+	if node == nil {
+		return nil
 	}
-	removeFromNode(t.Root)
+
+	if key < node.Key {
+		node.Left = remove(node.Left, key, docID)
+	} else if key > node.Key {
+		node.Right = remove(node.Right, key, docID)
+	} else {
+		newDocIDs := make([]string, 0)
+		for _, id := range node.DocIDs {
+			if id != docID {
+				newDocIDs = append(newDocIDs, id)
+			}
+		}
+		node.DocIDs = newDocIDs
+
+		if len(node.DocIDs) > 0 {
+			return node
+		}
+
+		if node.Left == nil && node.Right == nil {
+			return nil
+		}
+		if node.Left == nil {
+			return node.Right
+		}
+		if node.Right == nil {
+			return node.Left
+		}
+
+		succ := minNode(node.Right)
+		node.Key = succ.Key
+		node.DocIDs = succ.DocIDs
+		node.Right = remove(node.Right, succ.Key, "")
+	}
+	return rebalance(node)
+}
+
+func minNode(node *AVLNode) *AVLNode {
+	for node.Left != nil {
+		node = node.Left
+	}
+	return node
+}
+
+func rebalance(node *AVLNode) *AVLNode {
+	if node == nil {
+		return nil
+	}
+
+	updateHeight(node)
+	bf := balanceFactor(node)
+
+	if bf > 1 {
+		if balanceFactor(node.Left) < 0 {
+			node.Left = rotateLeft(node.Left)
+		}
+		return rotateRight(node)
+	}
+	if bf < -1 {
+		if balanceFactor(node.Right) > 0 {
+			node.Right = rotateRight(node.Right)
+		}
+		return rotateLeft(node)
+	}
+	return node
 }

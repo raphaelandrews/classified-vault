@@ -24,6 +24,14 @@ func NewDocumentHandler(service DocumentService) *DocumentHandler {
 	return &DocumentHandler{service: service}
 }
 
+// List returns documents accessible to the authenticated user based on clearance.
+// @Summary      List accessible documents
+// @Tags         documents
+// @Produce      json
+// @Param        Authorization header string true "Bearer {token}"
+// @Success      200  {array}   domain.Document
+// @Failure      401  {object}  map[string]string
+// @Router       /api/documents [get]
 func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 	session := requireSession(w, r)
 	if session == nil {
@@ -39,6 +47,16 @@ func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, docs)
 }
 
+// Get returns a single document by ID. Access denied if clearance is insufficient.
+// @Summary      Get document by ID
+// @Tags         documents
+// @Produce      json
+// @Param        Authorization header string true "Bearer {token}"
+// @Param        id path string true "Document ID"
+// @Success      200  {object}  domain.Document
+// @Failure      401  {object}  map[string]string
+// @Failure      403  {object}  map[string]string
+// @Router       /api/documents/{id} [get]
 func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	session := requireSession(w, r)
 	if session == nil {
