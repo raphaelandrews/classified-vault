@@ -1,7 +1,7 @@
 # Classified Vault — Arquitetura do Projeto
 
 > Sistema de Gerenciamento de Documentos Classificados  
-> Stack: Go (Fiber) + Go (Bubble Tea) + SQLite  
+> Stack: Go (net/http stdlib) + Go (Bubble Tea) + SQLite  
 > Paradigma: REST API + TUI Client
 
 ---
@@ -25,8 +25,9 @@
 15. [Deploy](#deploy)
 16. [Ordem de Implementação](#ordem-de-implementação)
 17. [Dependências](#dependências)
-18. [O que Apresentar para a Banca](#o-que-apresentar-para-a-banca)
-19. [Hardening & Known Gaps](#hardening--known-gaps)
+18. [Backend Stack Decisions](#backend-stack-decisions)
+19. [O que Apresentar para a Banca](#o-que-apresentar-para-a-banca)
+20. [Hardening & Known Gaps](#hardening--known-gaps)
 
 ---
 
@@ -64,66 +65,81 @@ classified-vault/
 │
 ├── internal/
 │   ├── domain/
-│   │   ├── user.go                  # Entidade User
-│   │   ├── document.go              # Entidade Document
-│   │   ├── audit.go                 # Entidade AuditLog
-│   │   └── clearance.go             # Enum ClearanceLevel + helpers
+│   │   ├── user.go                  # User entity
+│   │   ├── document.go              # Document entity
+│   │   ├── audit.go                 # AuditLog entity
+│   │   └── clearance.go             # ClearanceLevel enum + helpers
 │   │
-│   ├── ds/                          # Estruturas de dados implementadas manualmente
-│   │   ├── avl_tree.go              # Árvore AVL para índice de documentos
-│   │   ├── linked_list.go           # Lista encadeada para log de auditoria
-│   │   └── hash_map.go              # Hash map para cache de sessões
+│   ├── ds/                          # Hand-rolled data structures
+│   │   ├── avl_tree.go              # AVL tree — document index by classification
+│   │   ├── linked_list.go           # Doubly linked list — audit log buffer
+│   │   └── hash_map.go              # HashMap — session cache
 │   │
 │   ├── auth/
-│   │   ├── jwt.go                   # Geração e validação de JWT
-│   │   ├── bcrypt.go                # Hash e verificação de senha
-│   │   └── middleware.go            # Middleware de autenticação e autorização
+│   │   ├── token.go                 # UUID v4 token generation & validation
+│   │   ├── bcrypt.go                # Password hashing & verification
+│   │   └── middleware.go            # RequireAuth, RequireRole, RequireAnyRole
+│   │
+│   ├── apperr/
+│   │   └── apperr.go                # Structured AppError type
 │   │
 │   ├── repository/
-│   │   ├── user_repo.go             # CRUD de usuários no SQLite
-│   │   ├── document_repo.go         # CRUD de documentos no SQLite
-│   │   └── audit_repo.go            # Persistência do log de auditoria
+│   │   ├── user_repo.go             # CRUD users in SQLite
+│   │   ├── document_repo.go         # CRUD documents in SQLite
+│   │   └── audit_repo.go            # Persist audit logs
 │   │
 │   ├── service/
-│   │   ├── auth_service.go          # Lógica de login, registro, refresh
-│   │   ├── document_service.go      # Lógica de acesso com verificação de clearance
-│   │   ├── user_service.go          # Gestão de usuários (admin only)
-│   │   └── audit_service.go         # Consulta e persistência de logs
+│   │   ├── auth_service.go          # Login, logout, token refresh
+│   │   ├── document_service.go      # Access with clearance verification
+│   │   ├── user_service.go          # User management (admin only)
+│   │   └── audit_service.go         # Audit log queries and persistence
 │   │
-│   └── handler/
+│   ├── handler/
 │       ├── auth_handler.go          # POST /auth/login, /auth/logout
-│       ├── document_handler.go      # CRUD /documents
-│       ├── user_handler.go          # CRUD /users (admin)
-│       └── audit_handler.go         # GET /audit (admin)
+│       ├── document_handler.go      # CRUD /api/documents
+│       ├── user_handler.go          # CRUD /api/users (admin)
+│       └── audit_handler.go         # GET /api/audit (admin)
+│
+│   ├── middleware/
+│       ├── auth.go                  # RequireAuth, RequireRole, RequireAnyRole, RequireClearance
+│       ├── logger.go                # slog-based request logging
+│       ├── cors.go                  # CORS headers
+│       ├── recovery.go              # Panic recovery
+│       └── ratelimit.go             # Token-bucket rate limiter
 │
 ├── tui/
-│   ├── app.go                       # Root model do Bubble Tea
+│   ├── app.go                       # Root Bubble Tea model
 │   ├── styles/
-│   │   └── styles.go                # Lip Gloss styles centralizados
+│   │   └── styles.go                # Centralized Lip Gloss styles
 │   ├── screens/
-│   │   ├── login.go                 # Tela de login (Huh form)
-│   │   ├── dashboard.go             # Dashboard pós-login
-│   │   ├── documents.go             # Lista de documentos acessíveis
-│   │   ├── document_view.go         # Visualização de documento
-│   │   ├── document_create.go       # Formulário de criação (Huh)
-│   │   ├── users.go                 # Gestão de usuários (admin)
-│   │   ├── audit_log.go             # Visualização do log (admin)
-│   │   └── access_denied.go         # Tela de permissão negada
+│   │   ├── login.go                 # Login screen (Huh form)
+│   │   ├── dashboard.go             # Post-login dashboard
+│   │   ├── documents.go             # Accessible document list
+│   │   ├── document_view.go         # Document viewer
+│   │   ├── document_create.go       # Creation form (Huh)
+│   │   ├── users.go                 # User management (admin)
+│   │   ├── audit_log.go             # Audit log viewer (admin)
+│   │   └── access_denied.go         # Permission denied screen
 │   └── client/
-│       └── api.go                   # HTTP client para o backend
+│       └── api.go                   # HTTP client for the backend
 │
 ├── migrations/
+│   ├── 000_schema_migrations.sql    # Migration tracker table
 │   ├── 001_create_users.sql
 │   ├── 002_create_documents.sql
 │   └── 003_create_audit_logs.sql
 │
 ├── config/
-│   └── config.go                    # Config via variáveis de ambiente
+│   └── config.go                    # Config via environment variables
 │
+├── docs/                            # Swagger-generated docs (gitignored)
+├── .air.toml                        # Air hot-reload config
+├── .env.example                     # Documented env vars
 ├── go.mod
 ├── go.sum
 ├── Makefile
-├── Dockerfile                       # Para deploy do backend
+├── Dockerfile                       # Backend deploy
+├── tmp/                             # Air build output (gitignored)
 └── README.md
 ```
 
@@ -629,20 +645,24 @@ func (t *AVLTree) Remove(clearanceLevel int, docID string) {
 cmd/server/main.go
     │
     ├── Config (env vars)
-    ├── SQLite connection (modernc.org/sqlite)
-    ├── Run migrations
+    ├── Init slog structured logger (JSON in production, text in dev)
+    ├── SQLite connection with WAL mode + busy timeout (modernc.org/sqlite)
+    ├── Run versioned migrations (schema_migrations tracker table)
     ├── Init data structures (HashMap, AVLTree, LinkedList)
     ├── Init repositories
     ├── Init services
     ├── Init handlers
-    └── Fiber app
-            ├── Middleware: Logger, CORS, RateLimiter
-            ├── /auth/*       → AuthHandler (público)
-            ├── /api/*        → RequireAuth middleware
+    └── net/http Server
+            ├── Middleware chain: Logging, CORS, RateLimiter, Recovery
+            ├── /health          → Health check (DB status, uptime)
+            ├── /auth/*          → AuthHandler (public)
+            ├── /api/*           → RequireAuth middleware
             │       ├── /documents/*  → DocumentHandler
-            │       ├── /users/*      → UserHandler + RequireAdmin
-            │       └── /audit/*      → AuditHandler + RequireAdmin
-            └── Listen :8080
+            │       ├── /users/*      → UserHandler + RequireRole(admin)
+            │       └── /audit/*      → AuditHandler + RequireRole(admin)
+            ├── /docs/*          → Swagger UI (swaggo/swag, dev only)
+            ├── /debug/pprof/*   → pprof profiling endpoint (stdlib)
+            └── Graceful shutdown (signal.NotifyContext, 10s drain)
 ```
 
 ### main.go
@@ -653,105 +673,177 @@ cmd/server/main.go
 package main
 
 import (
-    "log"
+    "context"
+    "fmt"
+    "log/slog"
+    "net/http"
+    _ "net/http/pprof"
     "os"
-
-    "github.com/gofiber/fiber/v2"
-    "github.com/gofiber/fiber/v2/middleware/cors"
-    "github.com/gofiber/fiber/v2/middleware/logger"
-    "github.com/gofiber/fiber/v2/middleware/limiter"
+    "os/signal"
+    "runtime"
+    "sync/atomic"
+    "syscall"
+    "time"
 
     "classified-vault/config"
+    "classified-vault/internal/domain"
     "classified-vault/internal/ds"
+    "classified-vault/internal/auth"
     "classified-vault/internal/repository"
     "classified-vault/internal/service"
     "classified-vault/internal/handler"
-    "classified-vault/internal/auth"
+
+    _ "github.com/joho/godotenv/autoload"
 )
+
+var startupTime = time.Now()
 
 func main() {
     cfg := config.Load()
 
+    logger := setupLogger(cfg.Environment)
+    slog.SetDefault(logger)
+
     db, err := repository.Connect(cfg.DatabasePath)
     if err != nil {
-        log.Fatal("failed to connect to database:", err)
+        slog.Error("failed to connect to database", "error", err)
+        os.Exit(1)
     }
     defer db.Close()
 
     if err := repository.RunMigrations(db); err != nil {
-        log.Fatal("failed to run migrations:", err)
+        slog.Error("failed to run migrations", "error", err)
+        os.Exit(1)
     }
+    slog.Info("database initialized", "path", cfg.DatabasePath)
 
-    // Estruturas de dados globais
     sessionCache  := ds.NewHashMap[auth.Session](256)
     auditBuffer   := ds.NewLinkedList[domain.AuditLog]()
     documentIndex := ds.NewAVLTree()
 
-    // Repositórios
     userRepo     := repository.NewUserRepository(db)
     documentRepo := repository.NewDocumentRepository(db)
     auditRepo    := repository.NewAuditRepository(db)
 
-    // Popular AVL Tree com documentos existentes
-    docs, _ := documentRepo.FindAll()
+    docs, err := documentRepo.FindAll()
+    if err != nil {
+        slog.Error("failed to load document index", "error", err)
+        os.Exit(1)
+    }
     for _, doc := range docs {
         documentIndex.Insert(int(doc.Classification), doc.ID)
     }
+    slog.Info("document index built", "count", len(docs))
 
-    // Serviços
     authService     := service.NewAuthService(userRepo, sessionCache, cfg)
     documentService := service.NewDocumentService(documentRepo, documentIndex, auditBuffer, auditRepo)
     userService     := service.NewUserService(userRepo, auditBuffer, auditRepo)
     auditService    := service.NewAuditService(auditRepo, auditBuffer)
 
-    // Handlers
     authHandler     := handler.NewAuthHandler(authService)
     documentHandler := handler.NewDocumentHandler(documentService)
     userHandler     := handler.NewUserHandler(userService)
     auditHandler    := handler.NewAuditHandler(auditService)
 
-    // Fiber
-    app := fiber.New(fiber.Config{
-        ErrorHandler: handler.ErrorHandler,
-    })
+    mux := http.NewServeMux()
 
-    app.Use(logger.New())
-    app.Use(cors.New())
-    app.Use(limiter.New(limiter.Config{
-        Max: 100,
-    }))
+    // Public routes
+    mux.HandleFunc("POST /auth/login",  authHandler.Login)
+    mux.HandleFunc("POST /auth/logout", authHandler.Logout)
 
-    // Rotas públicas
-    app.Post("/auth/login",  authHandler.Login)
-    app.Post("/auth/logout", authHandler.Logout)
+    // Protected routes
+    api := auth.RequireAuth(sessionCache)
 
-    // Rotas protegidas
-    api := app.Group("/api", auth.RequireAuth(sessionCache))
+    mux.Handle("GET /api/me", api(authHandler.Me))
 
-    api.Get("/me", authHandler.Me)
+    mux.Handle("GET /api/documents",     api(documentHandler.List))
+    mux.Handle("GET /api/documents/{id}", api(documentHandler.Get))
+    mux.Handle("POST /api/documents",     api(auth.RequireAnyRole(domain.RoleAdmin, domain.RoleAnalyst)(documentHandler.Create)))
+    mux.Handle("PUT /api/documents/{id}", api(auth.RequireAnyRole(domain.RoleAdmin, domain.RoleAnalyst)(documentHandler.Update)))
+    mux.Handle("DELETE /api/documents/{id}", api(auth.RequireRole(domain.RoleAdmin)(documentHandler.Delete)))
 
-    docs := api.Group("/documents")
-    docs.Get("/",       documentHandler.List)
-    docs.Get("/:id",    documentHandler.Get)
-    docs.Post("/",      documentHandler.Create)
-    docs.Put("/:id",    documentHandler.Update)
-    docs.Delete("/:id", documentHandler.Delete)
+    mux.Handle("GET /api/users",     api(auth.RequireRole(domain.RoleAdmin)(userHandler.List)))
+    mux.Handle("POST /api/users",     api(auth.RequireRole(domain.RoleAdmin)(userHandler.Create)))
+    mux.Handle("PUT /api/users/{id}", api(auth.RequireRole(domain.RoleAdmin)(userHandler.Update)))
+    mux.Handle("DELETE /api/users/{id}", api(auth.RequireRole(domain.RoleAdmin)(userHandler.Delete)))
 
-    users := api.Group("/users", auth.RequireRole(domain.RoleAdmin))
-    users.Get("/",       userHandler.List)
-    users.Post("/",      userHandler.Create)
-    users.Put("/:id",    userHandler.Update)
-    users.Delete("/:id", userHandler.Delete)
+    mux.Handle("GET /api/audit", api(auth.RequireRole(domain.RoleAdmin)(auditHandler.List)))
 
-    audit := api.Group("/audit", auth.RequireRole(domain.RoleAdmin))
-    audit.Get("/", auditHandler.List)
+    // Health check
+    mux.HandleFunc("GET /health", healthHandler(db))
 
-    port := os.Getenv("PORT")
-    if port == "" {
-        port = "8080"
+    // pprof (stdlib, no extra deps)
+    mux.Handle("GET /debug/pprof/", http.DefaultServeMux)
+    mux.Handle("GET /debug/pprof/{profile}", http.DefaultServeMux)
+
+    // Middleware chain (outermost → innermost)
+    handler := corsMiddleware(
+        loggerMiddleware(
+            recoveryMiddleware(
+                rateLimitMiddleware(mux),
+            ),
+        ),
+    )
+
+    srv := &http.Server{
+        Addr:    ":" + cfg.ServerPort,
+        Handler: handler,
     }
 
-    log.Fatal(app.Listen(":" + port))
+    // Graceful shutdown
+    ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+    defer stop()
+
+    go func() {
+        slog.Info("server starting", "port", cfg.ServerPort)
+        if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+            slog.Error("server failed", "error", err)
+            os.Exit(1)
+        }
+    }()
+
+    <-ctx.Done()
+    slog.Info("shutting down...")
+
+    shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+
+    // Flush audit buffer to DB before exiting
+    slog.Info("flushing audit buffer", "count", auditBuffer.Size())
+    for _, entry := range auditBuffer.LastN(auditBuffer.Size()) {
+        auditRepo.Save(entry)
+    }
+
+    if err := srv.Shutdown(shutdownCtx); err != nil {
+        slog.Error("forceful shutdown", "error", err)
+    }
+    slog.Info("server stopped")
+}
+
+func setupLogger(env string) *slog.Logger {
+    if env == "production" {
+        return slog.New(slog.NewJSONHandler(os.Stdout, nil))
+    }
+    return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+}
+
+var requestCount atomic.Int64
+
+func healthHandler(db repository.DB) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        status := "ok"
+        dbStatus := "connected"
+        if err := db.Ping(); err != nil {
+            status = "degraded"
+            dbStatus = "disconnected"
+        }
+        uptime := time.Since(startupTime).Truncate(time.Second).String()
+        var m runtime.MemStats
+        runtime.ReadMemStats(&m)
+        fmt.Fprintf(w, `{"status":"%s","db":"%s","uptime":"%s","requests":%d,"goroutines":%d,"memory_mb":%d}`,
+            status, dbStatus, uptime, requestCount.Load(), runtime.NumGoroutine(), m.Alloc/1024/1024)
+    }
 }
 ```
 
@@ -792,11 +884,19 @@ func main() {
 |--------|-------------|------|-------|-------------------------|
 | GET    | /api/audit  | ✅    | admin | Lista logs de auditoria |
 
+### Health & Debug
+
+| Método | Rota                | Auth | Description                                                  |
+|--------|---------------------|------|--------------------------------------------------------------|
+| GET    | /health             | ❌    | JSON: status, DB connectivity, uptime, goroutines, memory    |
+| GET    | /debug/pprof/       | ❌    | pprof index page (stdlib)                                   |
+| GET    | /debug/pprof/{name} | ❌    | pprof profile (goroutine, heap, allocs, profile, trace, etc.)|
+
 ---
 
 ## Backend — Middleware e Segurança
 
-### JWT Middleware
+### Auth Middleware (net/http)
 
 ```go
 // internal/auth/middleware.go
@@ -809,52 +909,75 @@ type Session struct {
     ExpiresAt time.Time
 }
 
-func RequireAuth(cache *ds.HashMap[Session]) fiber.Handler {
-    return func(c *fiber.Ctx) error {
-        token := extractToken(c)
-        if token == "" {
-            return fiber.ErrUnauthorized
-        }
+// RequireAuth wraps an http.Handler; rejects unauthenticated requests.
+func RequireAuth(cache *ds.HashMap[Session]) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            token := extractToken(r)
+            if token == "" {
+                http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+                return
+            }
 
-        session, ok := cache.Get(token)
-        if !ok {
-            return fiber.ErrUnauthorized
-        }
+            session, ok := cache.Get(token)
+            if !ok || time.Now().After(session.ExpiresAt) {
+                if ok {
+                    cache.Delete(token)
+                }
+                http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+                return
+            }
 
-        if time.Now().After(session.ExpiresAt) {
-            cache.Delete(token)
-            return fiber.ErrUnauthorized
-        }
-
-        // Injeta sessão no contexto para os handlers
-        c.Locals("session", session)
-        c.Locals("token", token)
-        return c.Next()
+            ctx := context.WithValue(r.Context(), ctxKeySession, session)
+            ctx = context.WithValue(ctx, ctxKeyToken, token)
+            next.ServeHTTP(w, r.WithContext(ctx))
+        })
     }
 }
 
-func RequireRole(role domain.Role) fiber.Handler {
-    return func(c *fiber.Ctx) error {
-        session := c.Locals("session").(Session)
-        if session.Role != role {
-            return fiber.NewError(fiber.StatusForbidden, "Permissão Negada")
-        }
-        return c.Next()
+func RequireRole(role domain.Role) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            session := r.Context().Value(ctxKeySession).(Session)
+            if session.Role != role {
+                http.Error(w, `{"error":"permission denied"}`, http.StatusForbidden)
+                return
+            }
+            next.ServeHTTP(w, r)
+        })
     }
 }
 
-func RequireClearance(level domain.ClearanceLevel) fiber.Handler {
-    return func(c *fiber.Ctx) error {
-        session := c.Locals("session").(Session)
-        if session.Clearance < level {
-            return fiber.NewError(fiber.StatusForbidden, "Clearance Insuficiente")
-        }
-        return c.Next()
+func RequireAnyRole(roles ...domain.Role) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            session := r.Context().Value(ctxKeySession).(Session)
+            for _, role := range roles {
+                if session.Role == role {
+                    next.ServeHTTP(w, r)
+                    return
+                }
+            }
+            http.Error(w, `{"error":"permission denied"}`, http.StatusForbidden)
+        })
     }
 }
 
-func extractToken(c *fiber.Ctx) string {
-    auth := c.Get("Authorization")
+func RequireClearance(level domain.ClearanceLevel) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            session := r.Context().Value(ctxKeySession).(Session)
+            if session.Clearance < level {
+                http.Error(w, `{"error":"insufficient clearance"}`, http.StatusForbidden)
+                return
+            }
+            next.ServeHTTP(w, r)
+        })
+    }
+}
+
+func extractToken(r *http.Request) string {
+    auth := r.Header.Get("Authorization")
     if strings.HasPrefix(auth, "Bearer ") {
         return strings.TrimPrefix(auth, "Bearer ")
     }
@@ -919,7 +1042,16 @@ func (s *DocumentService) logAudit(log domain.AuditLog) {
 
 ## Banco de Dados — Schema
 
+SQLite in WAL mode (`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;`) for concurrent reads during writes. Migrations are versioned via a `schema_migrations` tracker table — only unapplied versions run on startup.
+
 ```sql
+-- migrations/000_schema_migrations.sql
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version   INTEGER PRIMARY KEY,
+    name      TEXT NOT NULL,
+    applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- migrations/001_create_users.sql
 CREATE TABLE IF NOT EXISTS users (
     id           TEXT PRIMARY KEY,
@@ -933,12 +1065,12 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Usuário admin padrão (senha: admin123 — trocar em produção)
+-- Default admin user (password: admin123 — change in production)
 INSERT OR IGNORE INTO users (id, username, password_hash, email, role, clearance)
 VALUES (
-    'usr_admin_000',
+    'usr_admin_0000000001',
     'admin',
-    '$2a$12$...',  -- bcrypt de 'admin123'
+    '$2a$12$LJ3m4ys3Kk0mMfFq1B8qHeEqHqFm3jNrSPRQukPMtRzPVQqK9aGhu',
     'admin@vault.local',
     'admin',
     4
@@ -951,7 +1083,7 @@ CREATE TABLE IF NOT EXISTS documents (
     content        TEXT NOT NULL,
     classification INTEGER NOT NULL DEFAULT 0,
     status         TEXT NOT NULL DEFAULT 'active',
-    tags           TEXT NOT NULL DEFAULT '[]',  -- JSON array
+    tags           TEXT NOT NULL DEFAULT '[]',
     created_by     TEXT NOT NULL REFERENCES users(id),
     created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -1317,12 +1449,21 @@ func (m AppModel) View() string {
 
 ```go
 // config/config.go
+package config
+
+import (
+    "os"
+    "strconv"
+    "time"
+
+    _ "github.com/joho/godotenv/autoload" // loads .env automatically on import
+)
 
 type Config struct {
     DatabasePath string
     JWTSecret    string
     ServerPort   string
-    ServerURL    string // usado pelo client TUI
+    ServerURL    string // used by TUI client
     SessionTTL   time.Duration
     Environment  string
 }
@@ -1439,11 +1580,19 @@ run-client:
 - [x] Estruturas de dados: HashMap, LinkedList, AVLTree
 
 ### Fase 2 — Backend Core
-- [ ] Repositórios (user, document, audit)
-- [ ] Auth service (bcrypt, JWT/token, login, logout)
-- [ ] Middleware RequireAuth e RequireRole
+- [ ] `internal/apperr/` — structured AppError type
+- [ ] `internal/middleware/` — auth, logger, cors, recovery, ratelimit
+- [ ] `internal/handler/` — HTTP handlers (auth, document, user, audit)
+- [ ] `config/config.go` — add godotenv autoload
+- [ ] Repositórios (user, document, audit) com WAL mode connection
+- [ ] Versioned migration runner (`repository/migrate.go`)
+- [ ] Auth service (bcrypt, UUID v4 token, login, logout)
+- [ ] Middleware RequireAuth, RequireRole, RequireAnyRole
 - [ ] Document service com verificação de clearance
-- [ ] Handlers e rotas Fiber
+- [ ] `cmd/server/main.go` — net/http server with health check, pprof, graceful shutdown
+- [ ] Swagger annotations on all handlers + `swag init`
+- [ ] `.air.toml` + `make dev` (hot-reload)
+- [ ] `.env.example` with documented env vars
 
 ### Fase 3 — Backend Complementar
 - [ ] User service (CRUD admin)
@@ -1477,11 +1626,20 @@ run-client:
 ### Backend (`go.mod`)
 
 ```
-github.com/gofiber/fiber/v2         // HTTP framework
-github.com/golang-jwt/jwt/v5        // JWT (opcional, pode usar UUID simples)
-github.com/google/uuid              // IDs
+github.com/google/uuid              // ID generation
+github.com/joho/godotenv            // .env file loader (autoload)
+github.com/swaggo/http-swagger/v2   // Swagger UI endpoint (dev only)
+github.com/swaggo/swag              // Swagger annotation generator
 golang.org/x/crypto                 // bcrypt
-modernc.org/sqlite                  // SQLite puro Go (sem CGO)
+modernc.org/sqlite                  // SQLite, pure Go (no CGO)
+```
+
+> No HTTP framework dependency. Go 1.22+ `net/http` handles routing with path params natively. Logging uses stdlib `log/slog`. Profiling via stdlib `net/http/pprof`. The total dependency count is kept minimal to emphasize the hand-written data structures.
+
+### Dev Tools (not in `go.mod`)
+
+```
+github.com/cosmtrek/air             // Hot-reload on save: `air` rebuilds + restarts automatically
 ```
 
 ### Client TUI (`go.mod` — mesmo módulo ou separado)
@@ -1492,6 +1650,37 @@ github.com/charmbracelet/lipgloss   // Estilos
 github.com/charmbracelet/bubbles    // Componentes prontos (list, textinput, spinner)
 github.com/charmbracelet/huh        // Formulários
 ```
+
+---
+
+## Backend Stack Decisions
+
+### Why net/http over Fiber/Gin/Echo
+
+Go 1.22+ `net/http.ServeMux` supports `"GET /api/documents/{id}"` route patterns with path params. For a project of this scope (15 routes, ~5 middlewares), an external framework is unnecessary weight. Benefits:
+
+| Decision | Rationale |
+|---|---|
+| **stdlib mux** | Zero HTTP dependencies. The banca sees direct Go, not a third-party abstraction. |
+| **`log/slog`** | Structured, leveled logging from stdlib (Go 1.21+). No need for zerolog/zap. |
+| **`context.Context`** | Native session propagation via `r.WithContext()` — no custom `c.Locals()` or framework-specific context. |
+| **middleware as `func(http.Handler) http.Handler`** | Standard Go middleware pattern. Readers/Writers are stdlib interfaces. |
+| **graceful shutdown** | `signal.NotifyContext` + `srv.Shutdown()` is 15 lines of stdlib. Fiber's graceful shutdown is essentially the same, so no advantage. |
+
+### Robustness additions (built into Phase 2)
+
+| Feature | Implementation |
+|---|---|
+| **Structured logging** | `slog.NewJSONHandler` in prod, `slog.NewTextHandler` in dev. All services log through the default logger. |
+| **SQLite WAL mode** | 2 pragmas on connect: `PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000`. Allows concurrent reads during writes. |
+| **Versioned migrations** | `migrations/000_schema_migrations.sql` tracker table. `RunMigrations` reads `migrations/*.sql` sorted, skips already-applied versions. |
+| **Graceful shutdown** | SIGINT/SIGTERM → stop accepting requests → flush audit buffer to DB → close server. 10s timeout. |
+| **Swagger/OpenAPI** | `swaggo/swag` annotations on handlers. `/docs` serves interactive Swagger UI in dev mode. |
+| **Structured errors** | `type AppError struct { Code int; Message string }` — handlers return this, a top-level response wrapper marshals to `{"error": msg}`. |
+| **Health check** | `GET /health` returns `{"status":"ok","db":"connected","uptime":"3m42s","requests":152,"goroutines":7,"memory_mb":4}`. No auth required. |
+| **pprof** | `GET /debug/pprof/goroutine?debug=1` gives live goroutine dump. stdlib, zero deps. |
+| **godotenv** | `_ "github.com/joho/godotenv/autoload"` loads `.env` on import. No manual `export` needed in dev. |
+| **Air** | `go install github.com/cosmtrek/air@latest && air` — hot-reload on file save. Rebuilds and restarts in < 1s. |
 
 ---
 
@@ -1522,34 +1711,21 @@ github.com/charmbracelet/huh        // Formulários
 
 ## Hardening & Known Gaps
 
-> Items to address before or shortly after the core implementation. Split into critical fixes and nice-to-have polish.
+> Items to address before or shortly after the core implementation. Checked items are resolved in the updated architecture.
 
 ### Minor Gaps — Fix Before Handlers
 
-- [ ] **`main.go:695` — silent error ignore**  
-  `docs, _ := documentRepo.FindAll()` discards the error. Startup cannot proceed without a properly built AVL index, so use `log.Fatal` on failure.
+- [x] **`main.go` — silent error ignore**  
+  Resolved. The new `main.go` checks `documentRepo.FindAll()` error with `slog.Error` + `os.Exit(1)`.
 
 - [ ] **Rename `auth/jwt.go` → `auth/token.go`**  
-  The system uses UUID v4 tokens + HashMap lookup, not actual JWT. Rename the file to avoid confusion during the presentation.
+  The system uses UUID v4 tokens + HashMap lookup, not actual JWT. Rename the file during Phase 2 implementation to avoid confusion.
 
 - [ ] **AVL `Remove` never prunes empty nodes**  
-  When the last `docID` is removed from a node, the node stays in the tree with an empty `DocIDs` slice forever. It will still be traversed by `QueryUpTo`, returning an empty slice from that node — no correctness bug, but wasted work and leaked tree nodes. Add a `deleteNode` helper that properly removes the node from the tree and rebalances.
+  When the last `docID` is removed from a node, the node stays in the tree with an empty `DocIDs` slice forever. It will still be traversed by `QueryUpTo` — no correctness bug, but wasted work and leaked tree nodes. Add a `deleteNode` helper that properly removes the node and rebalances.
 
-- [ ] **Add `RequireAnyRole(roles ...Role)` middleware**  
-  Current `RequireRole` checks `==` for a **single** role. Routes like `POST /api/documents` and `PUT /api/documents/:id` need "analyst or admin". Replace or augment with a variadic variant:
-  ```go
-  func RequireAnyRole(roles ...domain.Role) fiber.Handler {
-      return func(c *fiber.Ctx) error {
-          session := c.Locals("session").(Session)
-          for _, r := range roles {
-              if session.Role == r {
-                  return c.Next()
-              }
-          }
-          return fiber.NewError(fiber.StatusForbidden, "Permissão Negada")
-      }
-  }
-  ```
+- [x] **Add `RequireAnyRole(roles ...Role)` middleware**  
+  Resolved. In the middleware section above. Used in `main.go` for document create/update routes (`analyst` or `admin`).
 
 - [ ] **Input validation**  
   No validation is specified for any endpoint. Add at minimum:
@@ -1557,6 +1733,9 @@ github.com/charmbracelet/huh        // Formulários
   - Password minimum length (≥ 8 chars)
   - Document title/content max length (e.g. 256 / 64 KB)
   - Validate in handlers (light) or services (thorough)
+
+- [x] **Graceful shutdown**  
+  Resolved. `signal.NotifyContext` + audit buffer flush + `srv.Shutdown(timeout)` in the new `main.go`.
 
 ### Nice-to-add
 
@@ -1566,18 +1745,8 @@ github.com/charmbracelet/huh        // Formulários
 - [ ] **Data structure unit tests** (`internal/ds/*_test.go`)  
   Basic table-driven tests for AVL insert/balance, HashMap get/set/delete/collision, LinkedList append/lastN. Great for demo — open the terminal, run `go test ./internal/ds/ -v`, and show the tree rebalancing live.
 
-- [ ] **Graceful shutdown**  
-  Use `signal.NotifyContext` in `main.go` to trap SIGINT/SIGTERM. On shutdown, flush the in-memory linked-list audit buffer to the database so no log entries are lost.
-  ```go
-  ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-  defer stop()
-  // ... app setup ...
-  go func() {
-      <-ctx.Done()
-      auditBuffer.FlushTo(auditRepo) // persist remaining entries
-      app.Shutdown()
-  }()
-  ```
+- [ ] **Swagger annotations**  
+  Add `@Summary`, `@Param`, `@Success` comments to all handler files. Run `swag init` to generate `docs/`. Wire `/docs` endpoint in dev mode only.
 
 - [ ] **Rebuild AVL index from database on startup**  
-  Currently the index is populated once at startup from `documentRepo.FindAll()`. If the service layer directly inserts/removes from the index alongside the DB (which the plan shows), this is fine. But if the DB is ever modified externally, the index becomes stale. A `RebuildIndex()` method would be a safety net.
+  A `RebuildIndex()` method as a safety net if the DB is modified externally.
