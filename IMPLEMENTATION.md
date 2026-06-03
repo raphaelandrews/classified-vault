@@ -1580,19 +1580,18 @@ run-client:
 - [x] Estruturas de dados: HashMap, LinkedList, AVLTree
 
 ### Fase 2 — Backend Core
-- [ ] `internal/apperr/` — structured AppError type
-- [ ] `internal/middleware/` — auth, logger, cors, recovery, ratelimit
-- [ ] `internal/handler/` — HTTP handlers (auth, document, user, audit)
-- [ ] `config/config.go` — add godotenv autoload
-- [ ] Repositórios (user, document, audit) com WAL mode connection
-- [ ] Versioned migration runner (`repository/migrate.go`)
-- [ ] Auth service (bcrypt, UUID v4 token, login, logout)
-- [ ] Middleware RequireAuth, RequireRole, RequireAnyRole
-- [ ] Document service com verificação de clearance
-- [ ] `cmd/server/main.go` — net/http server with health check, pprof, graceful shutdown
-- [ ] Swagger annotations on all handlers + `swag init`
-- [ ] `.air.toml` + `make dev` (hot-reload)
-- [ ] `.env.example` with documented env vars
+- [x] `internal/apperr/` — structured AppError type
+- [x] `internal/middleware/` — auth, logger, cors, recovery, ratelimit
+- [x] `internal/handler/` — HTTP handlers (auth, document, user, audit)
+- [x] `config/config.go` — add godotenv autoload
+- [x] Repositórios (user, document, audit) com WAL mode connection
+- [x] Versioned migration runner (`repository/migrate.go`)
+- [x] Auth service (bcrypt, UUID v4 token, login, logout)
+- [x] Document service com verificação de clearance
+- [x] `cmd/server/main.go` — net/http server with health check, pprof, graceful shutdown
+- [x] Swagger annotations on all handlers + `swag init`
+- [x] `.air.toml` + `make dev` (hot-reload)
+- [x] `.env.example` with documented env vars
 
 ### Fase 3 — Backend Complementar
 - [ ] User service (CRUD admin)
