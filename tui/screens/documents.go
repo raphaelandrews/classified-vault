@@ -169,9 +169,9 @@ func (m *DocumentListModel) View() string {
 				case row == m.cursor:
 					return base.Foreground(styles.DarkText).Background(styles.Selected).Bold(true)
 				case row%2 == 0:
-					return base.Foreground(styles.RowEven)
+					return base.Foreground(styles.Foreground).Background(styles.RowEven)
 				default:
-					return base.Foreground(styles.RowOdd)
+					return base.Foreground(styles.Foreground).Background(styles.RowOdd)
 				}
 			}).
 			Headers("", "TITLE", "TIER", "FACTION", "FOLDER", "DATE")
@@ -203,8 +203,7 @@ func (m *DocumentListModel) View() string {
 	}
 
 	content := styles.BorderStyle.Render(sb.String())
-	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Top, content)
 	footer := styles.StatusBarStyle.Width(m.width).Render("[j/k] Move  [l] Open  [a] New  [h] Back  [r] Refresh")
 
-	return main + "\n" + footer
+	return lipgloss.JoinVertical(lipgloss.Left, content, footer)
 }

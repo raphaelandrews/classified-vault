@@ -6,6 +6,7 @@ import (
 
 	"classified-vault/config"
 	"classified-vault/internal/auth"
+	"classified-vault/internal/domain"
 	"classified-vault/internal/ds"
 	"classified-vault/internal/repository"
 )
@@ -24,17 +25,17 @@ func NewAuthService(userRepo *repository.UserRepository, sessionCache *ds.HashMa
 	}
 }
 
-func (s *AuthService) Login(username, password, ip string) (auth.Session, string, error) {
+func (s *AuthService) Login(username, password, ip string) (auth.Session, string, *domain.User, error) {
 	user, err := s.userRepo.FindByUsername(username)
 	if err != nil {
-		return auth.Session{}, "", fmt.Errorf("find user: %w", err)
+		return auth.Session{}, "", nil, fmt.Errorf("find user: %w", err)
 	}
 	if user == nil || !user.Active {
-		return auth.Session{}, "", fmt.Errorf("invalid credentials")
+		return auth.Session{}, "", nil, fmt.Errorf("invalid credentials")
 	}
 
 	if !auth.CheckPassword(password, user.PasswordHash) {
-		return auth.Session{}, "", fmt.Errorf("invalid credentials")
+		return auth.Session{}, "", nil, fmt.Errorf("invalid credentials")
 	}
 
 	token := auth.NewToken()
@@ -49,7 +50,7 @@ func (s *AuthService) Login(username, password, ip string) (auth.Session, string
 
 	s.sessionCache.Set(token, session)
 
-	return session, token, nil
+	return session, token, user, nil
 }
 
 func (s *AuthService) Logout(token string) error {

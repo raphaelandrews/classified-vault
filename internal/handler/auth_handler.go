@@ -11,7 +11,7 @@ import (
 )
 
 type AuthService interface {
-	Login(username, password, ip string) (auth.Session, string, error)
+	Login(username, password, ip string) (auth.Session, string, *domain.User, error)
 	Logout(token string) error
 	GetSession(token string) (*auth.Session, error)
 }
@@ -46,21 +46,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, token, err := h.service.Login(req.Username, req.Password, r.RemoteAddr)
+	session, token, user, err := h.service.Login(req.Username, req.Password, r.RemoteAddr)
 	if err != nil {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid credentials"})
 		return
 	}
 
 	h.cache.Set(token, session)
-
-	user := domain.User{
-		ID:        session.UserID,
-		Username:  session.Username,
-		Role:      session.Role,
-		Clearance: session.Clearance,
-		Faction:   session.Faction,
-	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"token": token,

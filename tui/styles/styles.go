@@ -12,8 +12,8 @@ var (
 	Foreground = lipgloss.Color("#d4be98")
 	Dimmed     = lipgloss.Color("#928374")
 	BorderCol  = lipgloss.Color("#504945")
-	RowEven    = lipgloss.Color("#3c3836")
-	RowOdd     = lipgloss.Color("#32302f")
+	RowEven    = lipgloss.Color("#504945")
+	RowOdd     = lipgloss.Color("#3c3836")
 	DarkText   = lipgloss.Color("#1d2021")
 )
 

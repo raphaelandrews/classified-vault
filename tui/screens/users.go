@@ -94,6 +94,7 @@ func (m *UsersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.addUser = ""
 			m.addEmail = ""
 			m.addPass = ""
+			m.cursor = 0
 			return m, m.loadUsers
 		}
 
@@ -175,9 +176,9 @@ func (m *UsersModel) View() string {
 				case row == m.cursor:
 					return base.Foreground(styles.DarkText).Background(styles.Selected).Bold(true)
 				case row%2 == 0:
-					return base.Foreground(styles.RowEven)
+					return base.Foreground(styles.Foreground).Background(styles.RowEven)
 				default:
-					return base.Foreground(styles.RowOdd)
+					return base.Foreground(styles.Foreground).Background(styles.RowOdd)
 				}
 			}).
 			Headers("", "USERNAME", "FACTION", "ROLE", "TIER", "STATUS")
@@ -198,8 +199,7 @@ func (m *UsersModel) View() string {
 	}
 
 	content := styles.BorderStyle.Render(sb.String())
-	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Top, content)
 	footer := styles.StatusBarStyle.Width(m.width).Render("[j/k] Move  [a] Register  [d] Dismiss  [r] Refresh  [h] Back")
 
-	return main + "\n" + footer
+	return lipgloss.JoinVertical(lipgloss.Left, content, footer)
 }

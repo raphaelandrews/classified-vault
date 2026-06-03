@@ -86,9 +86,9 @@ func (m *AuditLogModel) View() string {
 					return base.Foreground(styles.Foreground).Bold(true)
 				}
 				if row%2 == 0 {
-					return base.Foreground(styles.RowEven)
+					return base.Foreground(styles.Foreground).Background(styles.RowEven)
 				}
-				return base.Foreground(styles.RowOdd)
+				return base.Foreground(styles.Foreground).Background(styles.RowOdd)
 			}).
 			Headers("", "TIME", "ACTION", "USER", "RESOURCE")
 
@@ -109,8 +109,7 @@ func (m *AuditLogModel) View() string {
 	}
 
 	content := styles.BorderStyle.Render(sb.String())
-	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Top, content)
 	footer := styles.StatusBarStyle.Width(m.width).Render("[r] Refresh  [h] Back")
 
-	return main + "\n" + footer
+	return lipgloss.JoinVertical(lipgloss.Left, content, footer)
 }
