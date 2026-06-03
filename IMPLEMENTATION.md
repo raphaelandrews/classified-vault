@@ -1594,10 +1594,10 @@ run-client:
 - [x] `.env.example` with documented env vars
 
 ### Fase 3 — Backend Complementar
-- [ ] User service (CRUD admin)
-- [ ] Audit service
-- [ ] Integração AVLTree no document service
-- [ ] Testes manuais via curl/Insomnia
+- [x] User service (CRUD admin) — Create, Update, Delete with audit logging and auto-clearance
+- [x] Audit service — List, ListByUser, async DB persistence
+- [x] Integração AVLTree no document service — QueryUpTo, Insert, Remove on CRUD
+- [x] Testes manuais via curl — smoke test script (`scripts/smoke_test.sh`) — all endpoints verified
 
 ### Fase 4 — TUI
 - [ ] Styles com Lip Gloss (paleta, borders, badges de clearance)
@@ -1717,8 +1717,8 @@ Go 1.22+ `net/http.ServeMux` supports `"GET /api/documents/{id}"` route patterns
 - [x] **`main.go` — silent error ignore**  
   Resolved. The new `main.go` checks `documentRepo.FindAll()` error with `slog.Error` + `os.Exit(1)`.
 
-- [ ] **Rename `auth/jwt.go` → `auth/token.go`**  
-  The system uses UUID v4 tokens + HashMap lookup, not actual JWT. Rename the file during Phase 2 implementation to avoid confusion.
+- [x] **Rename `auth/jwt.go` → `auth/token.go`**  
+  Resolved. File is `internal/auth/token.go`, uses UUID v4 via `github.com/google/uuid`.
 
 - [ ] **AVL `Remove` never prunes empty nodes**  
   When the last `docID` is removed from a node, the node stays in the tree with an empty `DocIDs` slice forever. It will still be traversed by `QueryUpTo` — no correctness bug, but wasted work and leaked tree nodes. Add a `deleteNode` helper that properly removes the node and rebalances.

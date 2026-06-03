@@ -80,6 +80,11 @@ func main() {
 	userService := service.NewUserService(userRepo, auditBuffer, auditRepo)
 	auditService := service.NewAuditService(auditRepo, auditBuffer)
 
+	if err := userService.SeedAdmin(cfg.AdminPassword); err != nil {
+		slog.Error("failed to seed admin user", "error", err)
+		os.Exit(1)
+	}
+
 	authHandler := handler.NewAuthHandler(authService, sessionCache)
 	documentHandler := handler.NewDocumentHandler(documentService)
 	userHandler := handler.NewUserHandler(userService)
