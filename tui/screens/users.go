@@ -21,19 +21,37 @@ type UsersModel struct {
 	width     int
 	height    int
 
-	adding   bool
-	addUser  string
-	addEmail string
-	addPass  string
-	addRole  int
-	addStep  int
-	addDone  string
+	adding     bool
+	addUser    string
+	addEmail   string
+	addPass    string
+	addRole    int
+	addFaction int
+	addStep    int
+	addDone    string
+	numBuf     string
+}
+
+var addRoles = []domain.Role{domain.RoleAssociate, domain.RoleVillager, domain.RoleKeeper, domain.RoleMayor}
+var addFactions = []domain.Faction{
+	domain.FactionMuseum,
+	domain.FactionBulletinBoard,
+	domain.FactionCommunityCenter,
+	domain.FactionCarpentersShop,
+	domain.FactionPierDocks,
+	domain.FactionAdventurersGuild,
+	domain.FactionHarveysClinic,
+	domain.FactionJojaCorp,
+	domain.FactionWizardsTower,
+	domain.FactionQisOffice,
+	domain.FactionMayorsOffice,
 }
 
 func NewUsersModel(api *client.APIClient) UsersModel {
 	return UsersModel{
-		apiClient: api,
-		addRole:   3,
+		apiClient:  api,
+		addRole:    1,
+		addFaction: 0,
 	}
 }
 
@@ -44,7 +62,7 @@ func (m *UsersModel) Init() tea.Cmd {
 func (m *UsersModel) loadUsers() tea.Msg {
 	users, err := m.apiClient.ListUsers()
 	if err != nil {
-		return fmt.Errorf("failed to load users: %w", err)
+		return fmt.Errorf("failed to load villagers: %w", err)
 	}
 	return users
 }
@@ -70,7 +88,7 @@ func (m *UsersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.adding {
 			return m.updateAddForm(msg)
 		}
-		if m.err != "" && strings.Contains(m.err, "user created:") {
+		if m.err != "" && strings.Contains(m.err, "villager registered:") {
 			m.err = ""
 			m.adding = false
 			m.addUser = ""
@@ -98,7 +116,8 @@ func (m *UsersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.addUser = ""
 			m.addEmail = ""
 			m.addPass = ""
-			m.addRole = 3
+			m.addRole = 1
+			m.addFaction = 0
 			return m, nil
 		case "D":
 			if m.cursor < len(m.users) {
@@ -114,46 +133,6 @@ func (m *UsersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "R":
 			return m, m.loadUsers
 		case "H", "Q":
-			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDashboard} }
-		case "CTRL+C":
-			return m, tea.Quit
-		}
-
-		if m.adding {
-			return m.updateAddForm(msg)
-		}
-
-		switch strings.ToUpper(msg.String()) {
-		case "UP", "K":
-			if m.cursor > 0 {
-				m.cursor--
-			} else {
-				m.cursor = len(m.users) - 1
-			}
-		case "DOWN", "J":
-			if m.cursor < len(m.users)-1 {
-				m.cursor++
-			} else {
-				m.cursor = 0
-			}
-		case "N":
-			m.adding = true
-			m.addStep = 0
-			return m, nil
-		case "DELETE":
-			if m.cursor < len(m.users) {
-				user := m.users[m.cursor]
-				return m, func() tea.Msg {
-					err := m.apiClient.DeleteUser(user.ID)
-					if err != nil {
-						return err
-					}
-					return NavigateMsg{Screen: ScreenUsers}
-				}
-			}
-		case "R":
-			return m, m.loadUsers
-		case "Q":
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDashboard} }
 		case "CTRL+C":
 			return m, tea.Quit
@@ -175,14 +154,14 @@ func (m *UsersModel) View() string {
 		return m.viewAddForm()
 	}
 
-	sb.WriteString(styles.DocTitle.Render("👥 User Management") + "\n\n")
+	sb.WriteString(styles.DocTitle.Render("★ Villagers of Pelican Town") + "\n\n")
 
 	if m.err != "" {
 		sb.WriteString(styles.ErrorStyle.Render(m.err) + "\n")
 	}
 
 	if len(m.users) == 0 {
-		sb.WriteString(styles.DocMeta.Render("  No users found.\n"))
+		sb.WriteString(styles.DocMeta.Render("  No villagers found.\n"))
 	} else {
 		t := table.New().
 			Border(lipgloss.NormalBorder()).
@@ -201,7 +180,7 @@ func (m *UsersModel) View() string {
 					return base.Foreground(styles.RowOdd)
 				}
 			}).
-			Headers("", "USERNAME", "ROLE", "CLEARANCE", "STATUS")
+			Headers("", "USERNAME", "FACTION", "ROLE", "TIER", "STATUS")
 
 		for i, u := range m.users {
 			marker := fmt.Sprintf("%d", i+1)
@@ -212,15 +191,15 @@ func (m *UsersModel) View() string {
 			if !u.Active {
 				status = "INACTIVE"
 			}
-			t.Row(marker, u.Username, string(u.Role), styles.ClearanceBadge(u.Clearance.String()), status)
+			t.Row(marker, u.Username, string(u.Faction), string(u.Role), styles.ClearanceBadge(u.Clearance.String()), status)
 		}
 
 		sb.WriteString(t.Render())
 	}
 
 	content := styles.BorderStyle.Render(sb.String())
-	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Center, content)
-	footer := styles.StatusBarStyle.Width(m.width).Render("[j/k] Move  [a] Add  [d] Delete  [r] Refresh  [h] Back")
+	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Top, content)
+	footer := styles.StatusBarStyle.Width(m.width).Render("[j/k] Move  [a] Register  [d] Dismiss  [r] Refresh  [h] Back")
 
 	return main + "\n" + footer
 }

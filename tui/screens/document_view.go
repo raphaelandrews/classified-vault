@@ -45,22 +45,35 @@ func (m *DocumentViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *DocumentViewModel) View() string {
-	header := fmt.Sprintf("📄 %s", styles.DocTitle.Render(m.doc.Title))
+	header := fmt.Sprintf("★ %s", styles.DocTitle.Render(m.doc.Title))
 
 	var sb strings.Builder
 	sb.WriteString(header + "\n\n")
 	sb.WriteString(styles.DocMeta.Render(
-		fmt.Sprintf("Classification:  %s", styles.ClearanceBadge(m.doc.Classification.String())),
+		fmt.Sprintf("Tier:       %s", styles.ClearanceBadge(m.doc.Classification.String())),
 	) + "\n")
 	sb.WriteString(styles.DocMeta.Render(
-		fmt.Sprintf("Created:        %s", m.doc.CreatedAt.Format("2006-01-02 15:04")),
+		fmt.Sprintf("Faction:    %s", styles.FactionBadge(string(m.doc.Faction))),
+	) + "\n")
+	if m.doc.Folder != "" {
+		sb.WriteString(styles.DocMeta.Render(
+			fmt.Sprintf("Folder:     ▸ %s", m.doc.Folder),
+		) + "\n")
+	}
+	sb.WriteString(styles.DocMeta.Render(
+		fmt.Sprintf("Scribed:    %s", m.doc.CreatedAt.Format("2006-01-02 15:04")),
 	) + "\n")
 	sb.WriteString(styles.DocMeta.Render(
-		fmt.Sprintf("Author:         %s", m.doc.CreatedBy),
+		fmt.Sprintf("Author:     %s", m.doc.CreatedBy),
 	) + "\n")
 	if len(m.doc.Tags) > 0 {
 		sb.WriteString(styles.DocMeta.Render(
-			fmt.Sprintf("Tags:           %s", strings.Join(m.doc.Tags, ", ")),
+			fmt.Sprintf("Tags:       %s", strings.Join(m.doc.Tags, ", ")),
+		) + "\n")
+	}
+	if len(m.doc.ReferenceIDs) > 0 {
+		sb.WriteString(styles.DocMeta.Render(
+			fmt.Sprintf("Refs:       %s", strings.Join(m.doc.ReferenceIDs, ", ")),
 		) + "\n")
 	}
 	sb.WriteString("\n" + lipgloss.NewStyle().
@@ -69,7 +82,7 @@ func (m *DocumentViewModel) View() string {
 		Render(m.doc.Content))
 
 	content := styles.BorderStyle.Render(sb.String())
-	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Center, content)
+	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Top, content)
 	footer := styles.StatusBarStyle.Width(m.width).Render("[h] Back  [q] Quit")
 
 	return main + "\n" + footer

@@ -13,6 +13,7 @@ import (
 
 type AccessDeniedModel struct {
 	title       string
+	faction     string
 	userCle     domain.ClearanceLevel
 	requiredCle domain.ClearanceLevel
 	width       int
@@ -22,6 +23,7 @@ type AccessDeniedModel struct {
 func NewAccessDeniedModel(msg DocAccessDeniedMsg) AccessDeniedModel {
 	return AccessDeniedModel{
 		title:       msg.Title,
+		faction:     msg.Faction,
 		userCle:     msg.UserCle,
 		requiredCle: msg.RequiredCle,
 	}
@@ -50,14 +52,15 @@ func (m *AccessDeniedModel) View() string {
 	var sb strings.Builder
 
 	sb.WriteString("\n\n")
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444")).Bold(true).Render("          🚫") + "\n\n")
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444")).Bold(true).Render("    ACCESS DENIED") + "\n\n")
-	sb.WriteString(styles.DocMeta.Render("    Insufficient clearance level.") + "\n\n")
-	sb.WriteString(fmt.Sprintf("    Your clearance:     %s\n", styles.ClearanceBadge(m.userCle.String())))
-	sb.WriteString(fmt.Sprintf("    Required:           %s\n", styles.ClearanceBadge(m.requiredCle.String())))
-	sb.WriteString(fmt.Sprintf("    Document:           %s\n", styles.DocMeta.Render(m.title)))
+	sb.WriteString(lipgloss.NewStyle().Foreground(styles.Error).Bold(true).Render("          SEALED") + "\n\n")
+	sb.WriteString(lipgloss.NewStyle().Foreground(styles.Error).Bold(true).Render("    ACCESS DENIED") + "\n\n")
+	sb.WriteString(styles.DocMeta.Render("    Insufficient tier or wrong faction.") + "\n\n")
+	sb.WriteString(fmt.Sprintf("    Your tier:        %s\n", styles.ClearanceBadge(m.userCle.String())))
+	sb.WriteString(fmt.Sprintf("    Required tier:    %s\n", styles.ClearanceBadge(m.requiredCle.String())))
+	sb.WriteString(fmt.Sprintf("    Scroll faction:   %s\n", styles.FactionBadge(m.faction)))
+	sb.WriteString(fmt.Sprintf("    Scroll:           %s\n", styles.DocMeta.Render(m.title)))
 	sb.WriteString("\n")
-	sb.WriteString(styles.DocMeta.Render("    This attempt has been logged.") + "\n\n")
+	sb.WriteString(styles.DocMeta.Render("    This attempt has been recorded in the Town Ledger.") + "\n\n")
 	sb.WriteString(styles.DocMeta.Render("        [h] Back"))
 
 	return lipgloss.Place(

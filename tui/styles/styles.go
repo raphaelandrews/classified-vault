@@ -3,18 +3,18 @@ package styles
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	Primary    = lipgloss.Color("#A550DF")
-	Accent     = lipgloss.Color("#C084FC")
-	Success    = lipgloss.Color("#34D399")
-	Error      = lipgloss.Color("#FB7185")
-	Warning    = lipgloss.Color("#FBBF24")
-	Selected   = lipgloss.Color("#FDE68A")
-	Foreground = lipgloss.Color("#F1F5F9")
-	Dimmed     = lipgloss.Color("#94A3B8")
-	BorderCol  = lipgloss.Color("#334155")
-	RowEven    = lipgloss.Color("#E2E8F0")
-	RowOdd     = lipgloss.Color("#CBD5E1")
-	DarkText   = lipgloss.Color("#1F1C23")
+	Primary    = lipgloss.Color("#a9b665")
+	Accent     = lipgloss.Color("#d8a657")
+	Success    = lipgloss.Color("#a9b665")
+	Error      = lipgloss.Color("#ea6962")
+	Warning    = lipgloss.Color("#d8a657")
+	Selected   = lipgloss.Color("#e78a4e")
+	Foreground = lipgloss.Color("#d4be98")
+	Dimmed     = lipgloss.Color("#928374")
+	BorderCol  = lipgloss.Color("#504945")
+	RowEven    = lipgloss.Color("#3c3836")
+	RowOdd     = lipgloss.Color("#32302f")
+	DarkText   = lipgloss.Color("#1d2021")
 )
 
 var (
@@ -24,13 +24,13 @@ var (
 
 	HeaderStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(Foreground).
+			Foreground(DarkText).
 			Background(Primary).
 			Padding(0, 1)
 
 	BorderStyle = lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(Primary).
+			BorderForeground(BorderCol).
 			Padding(1, 2)
 
 	SelectedStyle = lipgloss.NewStyle().
@@ -58,18 +58,49 @@ var (
 
 func ClearanceBadge(level string) string {
 	switch level {
-	case "PUBLIC":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#94A3B8")).Render("[ PUBLIC     ]")
-	case "RESTRICTED":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#60A5FA")).Render("[ RESTRICTED ]")
-	case "CONFIDENTIAL":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#FBBF24")).Render("[ CONFIDENTIAL]")
-	case "SECRET":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#FB923C")).Render("[ SECRET     ]")
-	case "TOP SECRET":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#F87171")).Render("[ TOP SECRET ]")
+	case "PUBLIC NOTICE":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#928374")).Render("[ PUBLIC NOTICE  ]")
+	case "COUNCIL EYES ONLY":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#a9b665")).Render("[ COUNCIL EYES   ]")
+	case "GUILD BUSINESS":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#d8a657")).Render("[ GUILD BUSINESS ]")
+	case "CORPORATE ACCESS":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#e78a4e")).Render("[ CORPORATE ACC  ]")
+	case "ARCANE KNOWLEDGE":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#d3869b")).Render("[ ARCANE KNOWLEDGE ]")
+	case "JUNIMO SCRIPT":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#ea6962")).Render("[ JUNIMO SCRIPT  ]")
 	default:
-		return lipgloss.NewStyle().Foreground(Dimmed).Render("[ UNKNOWN    ]")
+		return lipgloss.NewStyle().Foreground(Dimmed).Render("[ UNKNOWN        ]")
+	}
+}
+
+func FactionBadge(faction string) string {
+	switch faction {
+	case "Mayor's Office":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#ea6962")).Render("[ Mayor's Office ]")
+	case "Wizard's Tower":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#d3869b")).Render("[ Wizard's Tower ]")
+	case "Joja Corp":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#e78a4e")).Render("[ Joja Corp      ]")
+	case "Adventurer's Guild":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#d8a657")).Render("[ Adventurer's G ]")
+	case "Harvey's Clinic":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#83a598")).Render("[ Harvey's Clinic ]")
+	case "Community Center":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#a9b665")).Render("[ Community Ctr  ]")
+	case "Carpenter's Shop":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#7daea3")).Render("[ Carpenter's    ]")
+	case "Museum":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#928374")).Render("[ Museum         ]")
+	case "Bulletin Board":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#bdae93")).Render("[ Bulletin Board ]")
+	case "Mr. Qi's Office":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#83a598")).Render("[ Mr. Qi's Off. ]")
+	case "Pier & Docks":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#7daea3")).Render("[ Pier & Docks  ]")
+	default:
+		return lipgloss.NewStyle().Foreground(Dimmed).Render("[ " + faction + " ]")
 	}
 }
 

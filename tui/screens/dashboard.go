@@ -67,36 +67,36 @@ func (m *DashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *DashboardModel) View() string {
-	header := fmt.Sprintf("🔒 CLASSIFIED VAULT    User: %s  [%s] [%s]",
+	header := fmt.Sprintf("★ PELICAN TOWN ARCHIVES    Villager: %s  %s  %s",
 		styles.SuccessStyle.Render(m.user.Username),
+		styles.FactionBadge(string(m.user.Faction)),
 		styles.ClearanceBadge(m.user.Clearance.String()),
-		styles.DocMeta.Render(string(m.user.Role)),
 	)
 
 	var sb strings.Builder
 	sb.WriteString(header + "\n\n")
 
 	sb.WriteString(styles.BorderStyle.Render(
-		styles.DocTitle.Render(fmt.Sprintf("📁 DOCUMENTS (%d accessible)", m.docCount))+"\n"+
-			styles.DocPrompt.Render("[D]")+" List Documents\n"+
-			styles.DocPrompt.Render("[A]")+" New Document",
+		styles.DocTitle.Render(fmt.Sprintf("SCROLLS (%d accessible)", m.docCount))+"\n"+
+			styles.DocPrompt.Render("[D]")+" Browse Scrolls\n"+
+			styles.DocPrompt.Render("[A]")+" Scribe New Scroll",
 	) + "\n\n")
 
-	if m.user.Role == domain.RoleAdmin {
+	if m.user.Role == domain.RoleMayor {
 		sb.WriteString(styles.BorderStyle.Render(
-			styles.DocTitle.Render("⚙ ADMINISTRATION")+"\n"+
-				styles.DocPrompt.Render("[U]")+" Manage Users\n"+
-				styles.DocPrompt.Render("[A]")+" Audit Log",
+			styles.DocTitle.Render("★ MAYOR'S ADMINISTRATION")+"\n"+
+				styles.DocPrompt.Render("[U]")+" Manage Villagers\n"+
+				styles.DocPrompt.Render("[L]")+" Town Ledger",
 		) + "\n\n")
-	} else if m.user.Role == domain.RoleAnalyst {
+	} else if m.user.Role == domain.RoleKeeper {
 		sb.WriteString(styles.BorderStyle.Render(
-			styles.DocTitle.Render("⚙ ANALYST")+"\n"+
-				styles.DocPrompt.Render("[A]")+" Create Documents",
+			styles.DocTitle.Render("★ RECORD KEEPER")+"\n"+
+				styles.DocPrompt.Render("[A]")+" Scribe New Scrolls",
 		) + "\n\n")
 	}
 
-	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Center, sb.String())
-	footer := styles.StatusBarStyle.Width(m.width).Render("[d] Documents  [a] New Doc  [u] Users  [l] Audit  [q] Logout")
+	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Top, sb.String())
+	footer := styles.StatusBarStyle.Width(m.width).Render("[d] Scrolls  [a] New  [u] Villagers  [l] Ledger  [q] Sign Out")
 
 	return main + "\n" + footer
 }

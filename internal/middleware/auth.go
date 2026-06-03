@@ -81,7 +81,7 @@ func RequireClearance(level domain.ClearanceLevel) func(http.Handler) http.Handl
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			session := SessionFromContext(r.Context())
 			if session == nil || session.Clearance < level {
-				http.Error(w, `{"error":"insufficient clearance"}`, http.StatusForbidden)
+				http.Error(w, `{"error":"insufficient tier"}`, http.StatusForbidden)
 				return
 			}
 			next.ServeHTTP(w, r)

@@ -25,9 +25,9 @@ func NewAuthHandler(service AuthService, cache *ds.HashMap[auth.Session]) *AuthH
 	return &AuthHandler{service: service, cache: cache}
 }
 
-// Login authenticates a user and returns a session token.
-// @Summary      Login
-// @Description  Authenticate with username and password
+// Login authenticates a villager and returns a session token.
+// @Summary      Sign In
+// @Description  Authenticate with username and password to access Pelican Town Archives
 // @Tags         auth
 // @Accept       json
 // @Produce      json
@@ -59,6 +59,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Username:  session.Username,
 		Role:      session.Role,
 		Clearance: session.Clearance,
+		Faction:   session.Faction,
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
@@ -80,7 +81,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.cache.Delete(token)
-	writeJSON(w, http.StatusOK, map[string]string{"status": "logged out"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "signed out"})
 }
 
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
@@ -95,6 +96,7 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		Username:  session.Username,
 		Role:      session.Role,
 		Clearance: session.Clearance,
+		Faction:   session.Faction,
 	})
 }
 

@@ -62,9 +62,9 @@ func (s *UserService) Create(user *domain.User) (*domain.User, error) {
 		UserID:   user.ID,
 		Username: user.Username,
 		Action:   domain.ActionUserCreated,
-		Resource: "user:" + user.ID,
+		Resource: "villager:" + user.ID,
 		Success:  true,
-		Details:  fmt.Sprintf("role=%s clearance=%s", user.Role, user.Clearance),
+		Details:  fmt.Sprintf("role=%s tier=%s faction=%s", user.Role, user.Clearance, user.Faction),
 	})
 
 	return user, nil
@@ -104,9 +104,9 @@ func (s *UserService) Update(id string, user *domain.User) (*domain.User, error)
 		UserID:   user.ID,
 		Username: user.Username,
 		Action:   domain.ActionUserUpdated,
-		Resource: "user:" + id,
+		Resource: "villager:" + id,
 		Success:  true,
-		Details:  fmt.Sprintf("role=%s clearance=%s", user.Role, user.Clearance),
+		Details:  fmt.Sprintf("role=%s tier=%s faction=%s", user.Role, user.Clearance, user.Faction),
 	})
 
 	return user, nil
@@ -129,28 +129,29 @@ func (s *UserService) Delete(id string) error {
 		UserID:   existing.ID,
 		Username: existing.Username,
 		Action:   domain.ActionUserDeleted,
-		Resource: "user:" + id,
+		Resource: "villager:" + id,
 		Success:  true,
 	})
 
 	return nil
 }
 
-func (s *UserService) SeedAdmin(defaultPassword string) error {
-	existing, err := s.userRepo.FindByUsername("admin")
+func (s *UserService) SeedMayor(defaultPassword string) error {
+	existing, err := s.userRepo.FindByUsername("lewis")
 	if err != nil {
-		return fmt.Errorf("check admin existence: %w", err)
+		return fmt.Errorf("check mayor existence: %w", err)
 	}
 	if existing == nil {
-		slog.Info("seeding default admin user", "username", "admin")
-		admin := &domain.User{
-			Username:     "admin",
-			Email:        "admin@vault.local",
-			Role:         domain.RoleAdmin,
+		slog.Info("seeding default mayor", "username", "lewis")
+		mayor := &domain.User{
+			Username:     "lewis",
+			Email:        "lewis@pelican.valley",
+			Role:         domain.RoleMayor,
+			Faction:      domain.FactionMayorsOffice,
 			PasswordHash: defaultPassword,
 		}
-		if _, err := s.Create(admin); err != nil {
-			return fmt.Errorf("create admin: %w", err)
+		if _, err := s.Create(mayor); err != nil {
+			return fmt.Errorf("create mayor: %w", err)
 		}
 	}
 	return nil

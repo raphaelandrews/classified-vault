@@ -22,7 +22,7 @@ func Load() *Config {
 	return &Config{
 		DatabasePath:  getEnv("DATABASE_PATH", "./vault.db"),
 		JWTSecret:     getEnv("JWT_SECRET", "change-me-in-production"),
-		AdminPassword: getEnv("ADMIN_PASSWORD", "admin123"),
+		AdminPassword: getEnv("INITIAL_MAYOR_PASSWORD", "mayor123"),
 		ServerPort:    getEnv("PORT", "8080"),
 		ServerURL:     getEnv("SERVER_URL", "http://localhost:8080"),
 		SessionTTL:    parseDuration(getEnv("SESSION_TTL", "8h")),

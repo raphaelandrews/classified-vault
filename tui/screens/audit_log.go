@@ -34,7 +34,7 @@ func (m *AuditLogModel) Init() tea.Cmd {
 func (m *AuditLogModel) loadLogs() tea.Msg {
 	logs, err := m.apiClient.ListAuditLogs()
 	if err != nil {
-		return fmt.Errorf("failed to load audit logs: %w", err)
+		return fmt.Errorf("failed to load town ledger: %w", err)
 	}
 	return logs
 }
@@ -56,8 +56,7 @@ func (m *AuditLogModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch strings.ToUpper(msg.String()) {
 		case "R":
 			return m, m.loadLogs
-		case "H",
-			"Q":
+		case "H", "Q":
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDashboard} }
 		case "CTRL+C":
 			return m, tea.Quit
@@ -68,14 +67,14 @@ func (m *AuditLogModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *AuditLogModel) View() string {
 	var sb strings.Builder
-	sb.WriteString(styles.DocTitle.Render("📋 Audit Log") + "\n\n")
+	sb.WriteString(styles.DocTitle.Render("★ Town Ledger") + "\n\n")
 
 	if m.err != "" {
 		sb.WriteString(styles.ErrorStyle.Render(m.err) + "\n")
 	}
 
 	if len(m.logs) == 0 {
-		sb.WriteString(styles.DocMeta.Render("  No audit entries.\n"))
+		sb.WriteString(styles.DocMeta.Render("  No ledger entries.\n"))
 	} else {
 		t := table.New().
 			Border(lipgloss.NormalBorder()).
@@ -94,9 +93,9 @@ func (m *AuditLogModel) View() string {
 			Headers("", "TIME", "ACTION", "USER", "RESOURCE")
 
 		for _, entry := range m.logs {
-			status := "✅"
+			status := "★"
 			if !entry.Success {
-				status = "🚫"
+				status = "✗"
 			}
 			time := entry.Timestamp.Format("15:04:05")
 			details := entry.Resource
@@ -110,7 +109,7 @@ func (m *AuditLogModel) View() string {
 	}
 
 	content := styles.BorderStyle.Render(sb.String())
-	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Center, content)
+	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Top, content)
 	footer := styles.StatusBarStyle.Width(m.width).Render("[r] Refresh  [h] Back")
 
 	return main + "\n" + footer

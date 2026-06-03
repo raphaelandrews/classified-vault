@@ -31,11 +31,12 @@ func (c *APIClient) GetDocument(id string) (*domain.Document, error) {
 	return &doc, nil
 }
 
-func (c *APIClient) CreateDocument(title, content string, classification domain.ClearanceLevel, tags []string) (*domain.Document, error) {
+func (c *APIClient) CreateDocument(title, content string, classification domain.ClearanceLevel, faction domain.Faction, tags []string) (*domain.Document, error) {
 	doc := domain.Document{
 		Title:          title,
 		Content:        content,
 		Classification: classification,
+		Faction:        faction,
 		Tags:           tags,
 	}
 	_, body, err := c.do("POST", "/api/documents", doc)
@@ -49,11 +50,12 @@ func (c *APIClient) CreateDocument(title, content string, classification domain.
 	return &created, nil
 }
 
-func (c *APIClient) UpdateDocument(id, title, content string, classification domain.ClearanceLevel, tags []string) (*domain.Document, error) {
+func (c *APIClient) UpdateDocument(id, title, content string, classification domain.ClearanceLevel, faction domain.Faction, tags []string) (*domain.Document, error) {
 	doc := domain.Document{
 		Title:          title,
 		Content:        content,
 		Classification: classification,
+		Faction:        faction,
 		Tags:           tags,
 	}
 	_, body, err := c.do("PUT", "/api/documents/"+id, doc)
@@ -77,6 +79,8 @@ type CatalogEntry struct {
 	Title          string   `json:"title"`
 	Classification int      `json:"classification"`
 	Status         string   `json:"status"`
+	Faction        string   `json:"faction"`
+	Folder         string   `json:"folder"`
 	Tags           []string `json:"tags"`
 	CreatedBy      string   `json:"created_by"`
 	CreatedAt      string   `json:"created_at"`

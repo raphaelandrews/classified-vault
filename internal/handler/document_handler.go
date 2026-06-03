@@ -26,9 +26,9 @@ func NewDocumentHandler(service DocumentService) *DocumentHandler {
 	return &DocumentHandler{service: service}
 }
 
-// List returns documents accessible to the authenticated user based on clearance.
-// @Summary      List accessible documents
-// @Tags         documents
+// List returns scrolls accessible to the authenticated villager based on tier and faction.
+// @Summary      List accessible scrolls
+// @Tags         scrolls
 // @Produce      json
 // @Param        Authorization header string true "Bearer {token}"
 // @Success      200  {array}   domain.Document
@@ -42,19 +42,19 @@ func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	docs, err := h.service.List(*session)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list documents"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list scrolls"})
 		return
 	}
 
 	writeJSON(w, http.StatusOK, docs)
 }
 
-// Get returns a single document by ID. Access denied if clearance is insufficient.
-// @Summary      Get document by ID
-// @Tags         documents
+// Get returns a single scroll by ID. Access denied if tier or faction insufficient.
+// @Summary      Get scroll by ID
+// @Tags         scrolls
 // @Produce      json
 // @Param        Authorization header string true "Bearer {token}"
-// @Param        id path string true "Document ID"
+// @Param        id path string true "Scroll ID"
 // @Success      200  {object}  domain.Document
 // @Failure      401  {object}  map[string]string
 // @Failure      403  {object}  map[string]string

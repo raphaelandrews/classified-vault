@@ -43,6 +43,7 @@ func (s *AuthService) Login(username, password, ip string) (auth.Session, string
 		Username:  user.Username,
 		Role:      user.Role,
 		Clearance: user.Clearance,
+		Faction:   user.Faction,
 		ExpiresAt: time.Now().Add(s.cfg.SessionTTL),
 	}
 

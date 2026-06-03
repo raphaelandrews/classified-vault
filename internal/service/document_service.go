@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -34,8 +35,27 @@ func NewDocumentService(
 }
 
 func (s *DocumentService) List(session auth.Session) ([]*domain.Document, error) {
-	accessibleIDs := s.index.QueryUpTo(int(session.Clearance))
-	return s.repo.FindByIDs(accessibleIDs)
+	maxTier := int(session.Clearance)
+	if session.Faction == domain.FactionMayorsOffice && session.Clearance >= domain.TierArcane {
+		maxTier = int(domain.TierJunimo)
+	}
+	if session.Faction == domain.FactionWizardsTower && maxTier < int(domain.TierArcane) {
+		maxTier = int(domain.TierArcane)
+	}
+
+	accessibleIDs := s.index.QueryUpTo(maxTier)
+	docs, err := s.repo.FindByIDs(accessibleIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	var filtered []*domain.Document
+	for _, doc := range docs {
+		if canAccess(session, doc) {
+			filtered = append(filtered, doc)
+		}
+	}
+	return filtered, nil
 }
 
 func (s *DocumentService) GetByID(session auth.Session, docID string) (*domain.Document, error) {
@@ -47,14 +67,14 @@ func (s *DocumentService) GetByID(session auth.Session, docID string) (*domain.D
 		return nil, fmt.Errorf("document not found")
 	}
 
-	if session.Clearance < doc.Classification {
+	if !canAccess(session, doc) {
 		s.logAudit(domain.AuditLog{
 			UserID:   session.UserID,
 			Username: session.Username,
 			Action:   domain.ActionAccessDenied,
-			Resource: "document:" + docID,
+			Resource: "scroll:" + docID,
 			Success:  false,
-			Details:  fmt.Sprintf("clearance %s < %s", session.Clearance, doc.Classification),
+			Details:  fmt.Sprintf("tier %d (%s) < %d (%s) faction=%s", session.Clearance, session.Clearance, doc.Classification, doc.Classification, doc.Faction),
 		})
 		return nil, fmt.Errorf("access denied")
 	}
@@ -62,8 +82,8 @@ func (s *DocumentService) GetByID(session auth.Session, docID string) (*domain.D
 	s.logAudit(domain.AuditLog{
 		UserID:   session.UserID,
 		Username: session.Username,
-		Action:   domain.ActionDocumentRead,
-		Resource: "document:" + docID,
+		Action:   domain.ActionScrollRead,
+		Resource: "scroll:" + docID,
 		Success:  true,
 	})
 
@@ -71,8 +91,11 @@ func (s *DocumentService) GetByID(session auth.Session, docID string) (*domain.D
 }
 
 func (s *DocumentService) Create(session auth.Session, doc *domain.Document) (*domain.Document, error) {
-	doc.ID = "doc_" + uuid.New().String()[:8]
+	doc.ID = "scr_" + uuid.New().String()[:8]
 	doc.CreatedBy = session.UserID
+	if doc.Faction == "" {
+		doc.Faction = session.Faction
+	}
 
 	if err := s.repo.Create(doc); err != nil {
 		return nil, err
@@ -83,10 +106,10 @@ func (s *DocumentService) Create(session auth.Session, doc *domain.Document) (*d
 	s.logAudit(domain.AuditLog{
 		UserID:   session.UserID,
 		Username: session.Username,
-		Action:   domain.ActionDocumentCreate,
-		Resource: "document:" + doc.ID,
+		Action:   domain.ActionScrollCreate,
+		Resource: "scroll:" + doc.ID,
 		Success:  true,
-		Details:  fmt.Sprintf("title=%s classification=%s", doc.Title, doc.Classification),
+		Details:  fmt.Sprintf("title=%s tier=%s faction=%s", doc.Title, doc.Classification, doc.Faction),
 	})
 
 	return doc, nil
@@ -101,14 +124,14 @@ func (s *DocumentService) Update(session auth.Session, id string, doc *domain.Do
 		return nil, fmt.Errorf("document not found")
 	}
 
-	if session.Clearance < existing.Classification {
+	if !canAccess(session, existing) {
 		s.logAudit(domain.AuditLog{
 			UserID:   session.UserID,
 			Username: session.Username,
 			Action:   domain.ActionAccessDenied,
-			Resource: "document:" + id,
+			Resource: "scroll:" + id,
 			Success:  false,
-			Details:  "update denied: insufficient clearance",
+			Details:  "update denied: insufficient tier or wrong faction",
 		})
 		return nil, fmt.Errorf("access denied")
 	}
@@ -126,8 +149,8 @@ func (s *DocumentService) Update(session auth.Session, id string, doc *domain.Do
 	s.logAudit(domain.AuditLog{
 		UserID:   session.UserID,
 		Username: session.Username,
-		Action:   domain.ActionDocumentUpdate,
-		Resource: "document:" + id,
+		Action:   domain.ActionScrollUpdate,
+		Resource: "scroll:" + id,
 		Success:  true,
 	})
 
@@ -143,16 +166,18 @@ func (s *DocumentService) Delete(session auth.Session, id string) error {
 		return fmt.Errorf("document not found")
 	}
 
-	if session.Clearance < existing.Classification {
-		s.logAudit(domain.AuditLog{
-			UserID:   session.UserID,
-			Username: session.Username,
-			Action:   domain.ActionAccessDenied,
-			Resource: "document:" + id,
-			Success:  false,
-			Details:  "delete denied: insufficient clearance",
-		})
-		return fmt.Errorf("access denied")
+	if !canAccess(session, existing) || string(session.Role) != string(domain.RoleMayor) {
+		if !canAccess(session, existing) {
+			s.logAudit(domain.AuditLog{
+				UserID:   session.UserID,
+				Username: session.Username,
+				Action:   domain.ActionAccessDenied,
+				Resource: "scroll:" + id,
+				Success:  false,
+				Details:  "delete denied: insufficient tier or wrong faction",
+			})
+			return fmt.Errorf("access denied")
+		}
 	}
 
 	if err := s.repo.Delete(id); err != nil {
@@ -164,8 +189,8 @@ func (s *DocumentService) Delete(session auth.Session, id string) error {
 	s.logAudit(domain.AuditLog{
 		UserID:   session.UserID,
 		Username: session.Username,
-		Action:   domain.ActionDocumentDelete,
-		Resource: "document:" + id,
+		Action:   domain.ActionScrollDelete,
+		Resource: "scroll:" + id,
 		Success:  true,
 	})
 
@@ -174,6 +199,26 @@ func (s *DocumentService) Delete(session auth.Session, id string) error {
 
 func (s *DocumentService) Catalog() ([]repository.DocMetadata, error) {
 	return s.repo.FindAllMetadata()
+}
+
+func canAccess(session auth.Session, doc *domain.Document) bool {
+	if doc.Classification == domain.TierPublic {
+		return true
+	}
+
+	if session.Faction == doc.Faction && session.Clearance >= doc.Classification {
+		return true
+	}
+
+	if session.Faction == domain.FactionMayorsOffice && session.Clearance >= domain.TierArcane {
+		return true
+	}
+
+	if session.Faction == domain.FactionWizardsTower && slices.Contains(doc.Tags, "arcane") {
+		return true
+	}
+
+	return false
 }
 
 func (s *DocumentService) logAudit(log domain.AuditLog) {

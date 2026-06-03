@@ -19,12 +19,13 @@ func (c *APIClient) ListUsers() ([]*domain.User, error) {
 	return users, nil
 }
 
-func (c *APIClient) CreateUser(username, email, password string, role domain.Role) (*domain.User, error) {
+func (c *APIClient) CreateUser(username, email, password string, role domain.Role, faction domain.Faction) (*domain.User, error) {
 	u := domain.User{
 		Username:     username,
 		Email:        email,
 		PasswordHash: password,
 		Role:         role,
+		Faction:      faction,
 	}
 	_, body, err := c.do("POST", "/api/users", u)
 	if err != nil {
@@ -37,13 +38,14 @@ func (c *APIClient) CreateUser(username, email, password string, role domain.Rol
 	return &created, nil
 }
 
-func (c *APIClient) UpdateUser(id, username, email, password string, role domain.Role, clearance domain.ClearanceLevel) (*domain.User, error) {
+func (c *APIClient) UpdateUser(id, username, email, password string, role domain.Role, clearance domain.ClearanceLevel, faction domain.Faction) (*domain.User, error) {
 	u := domain.User{
 		Username:     username,
 		Email:        email,
 		PasswordHash: password,
 		Role:         role,
 		Clearance:    clearance,
+		Faction:      faction,
 	}
 	_, body, err := c.do("PUT", "/api/users/"+id, u)
 	if err != nil {

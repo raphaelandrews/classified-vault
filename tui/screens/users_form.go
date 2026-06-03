@@ -7,7 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"classified-vault/internal/domain"
 	"classified-vault/tui/styles"
 )
 
@@ -29,15 +28,19 @@ func (m *UsersModel) updateAddForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.addStep = 2
 		case 2:
 			m.addStep = 3
+			m.numBuf = ""
 		case 3:
-			roles := []domain.Role{domain.RoleIntern, domain.RoleViewer, domain.RoleAnalyst, domain.RoleAdmin}
-			role := roles[m.addRole]
+			m.addStep = 4
+			m.numBuf = ""
+		case 4:
+			role := addRoles[m.addRole]
+			faction := addFactions[m.addFaction]
 			return m, func() tea.Msg {
-				_, err := m.apiClient.CreateUser(m.addUser, m.addEmail, m.addPass, role)
+				_, err := m.apiClient.CreateUser(m.addUser, m.addEmail, m.addPass, role, faction)
 				if err != nil {
 					return err
 				}
-				return fmt.Errorf("user created: %s", m.addUser)
+				return fmt.Errorf("villager registered: %s", m.addUser)
 			}
 		}
 		m.err = ""
@@ -63,17 +66,18 @@ func (m *UsersModel) updateAddForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		case 3:
 			m.addStep = 2
-		}
-	case "1", "2", "3", "4":
-		if m.addStep == 3 {
-			for r := 0; r < 4; r++ {
-				if msg.String() == fmt.Sprintf("%d", r+1) {
-					m.addRole = r
-				}
-			}
+		case 4:
+			m.addStep = 3
 		}
 	default:
-		if len(msg.Runes) == 1 {
+		k := msg.String()
+		if m.addStep == 3 {
+			m.numBuf += k
+			handleNumKey(&m.addRole, m.numBuf, len(addRoles))
+		} else if m.addStep == 4 {
+			m.numBuf += k
+			handleNumKey(&m.addFaction, m.numBuf, len(addFactions))
+		} else if len(msg.Runes) == 1 {
 			switch m.addStep {
 			case 0:
 				m.addUser += msg.String()
@@ -87,9 +91,17 @@ func (m *UsersModel) updateAddForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func handleNumKey(selected *int, key string, count int) {
+	for i := 0; i < count; i++ {
+		if key == fmt.Sprintf("%d", i+1) {
+			*selected = i
+		}
+	}
+}
+
 func (m *UsersModel) viewAddForm() string {
 	var sb strings.Builder
-	sb.WriteString(styles.DocTitle.Render("➕ Add User") + "\n\n")
+	sb.WriteString(styles.DocTitle.Render("★ Register New Villager") + "\n\n")
 
 	switch m.addStep {
 	case 0:
@@ -105,13 +117,24 @@ func (m *UsersModel) viewAddForm() string {
 		sb.WriteString(styles.DocPrompt.Render("Username: ") + styles.DocMeta.Render(m.addUser) + "\n")
 		sb.WriteString(styles.DocPrompt.Render("Email: ") + styles.DocMeta.Render(m.addEmail) + "\n\n")
 		sb.WriteString(styles.DocPrompt.Render("Role:\n"))
-		roles := []domain.Role{domain.RoleIntern, domain.RoleViewer, domain.RoleAnalyst, domain.RoleAdmin}
-		for i, r := range roles {
+		for i, r := range addRoles {
 			marker := " "
 			if i == m.addRole {
 				marker = "▶"
 			}
 			sb.WriteString(fmt.Sprintf("  %s %s  [%d]\n", marker, r, i+1))
+		}
+	case 4:
+		sb.WriteString(styles.DocPrompt.Render("Username: ") + styles.DocMeta.Render(m.addUser) + "\n")
+		sb.WriteString(styles.DocPrompt.Render("Email: ") + styles.DocMeta.Render(m.addEmail) + "\n")
+		sb.WriteString(styles.DocPrompt.Render("Role: ") + string(addRoles[m.addRole]) + "\n\n")
+		sb.WriteString(styles.DocPrompt.Render("Faction:\n"))
+		for i, f := range addFactions {
+			marker := " "
+			if i == m.addFaction {
+				marker = "▶"
+			}
+			sb.WriteString(fmt.Sprintf("  %s %s  [%d]\n", marker, f, i+1))
 		}
 	}
 

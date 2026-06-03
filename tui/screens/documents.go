@@ -29,6 +29,7 @@ type DocSelectedMsg struct {
 
 type DocAccessDeniedMsg struct {
 	Title       string
+	Faction     string
 	UserCle     domain.ClearanceLevel
 	RequiredCle domain.ClearanceLevel
 }
@@ -50,6 +51,34 @@ func (m *DocumentListModel) loadDocs() tea.Msg {
 		return fmt.Errorf("failed to load catalog: %w", err)
 	}
 	return entries
+}
+
+func (m *DocumentListModel) canAccess(entry client.CatalogEntry) bool {
+	docTier := domain.ClearanceLevel(entry.Classification)
+	docFaction := domain.Faction(entry.Faction)
+
+	if docTier == domain.TierPublic {
+		return true
+	}
+	if m.user.Faction == docFaction && m.user.Clearance >= docTier {
+		return true
+	}
+	if m.user.Faction == domain.FactionMayorsOffice && m.user.Clearance >= domain.TierArcane {
+		return true
+	}
+	if m.user.Faction == domain.FactionWizardsTower && containsArcane(entry.Tags) {
+		return true
+	}
+	return false
+}
+
+func containsArcane(tags []string) bool {
+	for _, t := range tags {
+		if t == "arcane" {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *DocumentListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -85,15 +114,16 @@ func (m *DocumentListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ENTER", "L":
 			if len(m.docs) > 0 && m.cursor < len(m.docs) {
 				entry := m.docs[m.cursor]
-				docCle := domain.ClearanceLevel(entry.Classification)
-				if m.user.Clearance >= docCle {
+				docTier := domain.ClearanceLevel(entry.Classification)
+				if m.canAccess(entry) {
 					return m, func() tea.Msg { return DocSelectedMsg{DocID: entry.ID} }
 				}
 				return m, func() tea.Msg {
 					return DocAccessDeniedMsg{
 						Title:       entry.Title,
+						Faction:     entry.Faction,
 						UserCle:     m.user.Clearance,
-						RequiredCle: docCle,
+						RequiredCle: docTier,
 					}
 				}
 			}
@@ -117,7 +147,7 @@ func (m *DocumentListModel) View() string {
 	header := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(styles.Primary).
-		Render(fmt.Sprintf("📁 DOCUMENTS — clearance: %s", styles.ClearanceBadge(m.user.Clearance.String())))
+		Render(fmt.Sprintf("SCROLLS — %s  %s", styles.ClearanceBadge(m.user.Clearance.String()), styles.FactionBadge(string(m.user.Faction))))
 	sb.WriteString(header + "\n\n")
 
 	if m.err != "" {
@@ -125,7 +155,7 @@ func (m *DocumentListModel) View() string {
 	}
 
 	if len(m.docs) == 0 {
-		sb.WriteString(styles.DocMeta.Render("  No documents found.\n"))
+		sb.WriteString(styles.DocMeta.Render("  No scrolls found.\n"))
 	} else {
 		t := table.New().
 			Border(lipgloss.NormalBorder()).
@@ -144,32 +174,36 @@ func (m *DocumentListModel) View() string {
 					return base.Foreground(styles.RowOdd)
 				}
 			}).
-			Headers("", "TITLE", "CLASSIFICATION", "DATE")
+			Headers("", "TITLE", "TIER", "FACTION", "FOLDER", "DATE")
 
 		for i, entry := range m.docs {
-			docCle := domain.ClearanceLevel(entry.Classification)
 			marker := fmt.Sprintf("%d", i+1)
 			title := entry.Title
-			cls := styles.ClearanceBadge(docCle.String())
+			tier := styles.ClearanceBadge(domain.ClearanceLevel(entry.Classification).String())
+			faction := styles.FactionBadge(entry.Faction)
+			folder := ""
+			if entry.Folder != "" {
+				folder = styles.DocMeta.Render("▸ " + entry.Folder)
+			}
 			date := styles.DocMeta.Render(entry.CreatedAt[:10])
 
-			if m.user.Clearance < docCle {
+			if !m.canAccess(entry) {
 				marker = "🔒"
 				title = styles.DocMeta.Render(title)
-				cls = styles.DocMeta.Render("[ RESTRICTED ]")
+				tier = styles.DocMeta.Render("[ SEALED        ]")
 			}
 			if i == m.cursor {
 				marker = "▶"
 			}
 
-			t.Row(marker, title, cls, date)
+			t.Row(marker, title, tier, faction, folder, date)
 		}
 
 		sb.WriteString(t.Render())
 	}
 
 	content := styles.BorderStyle.Render(sb.String())
-	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Center, content)
+	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Top, content)
 	footer := styles.StatusBarStyle.Width(m.width).Render("[j/k] Move  [l] Open  [a] New  [h] Back  [r] Refresh")
 
 	return main + "\n" + footer

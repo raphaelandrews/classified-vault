@@ -1,8 +1,8 @@
 package main
 
-// @title           Classified Vault API
+// @title           Pelican Town Archives API
 // @version         1.0
-// @description     Secure classified document management system.
+// @description     Secure scroll management system for Pelican Town public services.
 // @host            localhost:8080
 // @BasePath        /
 
@@ -70,15 +70,15 @@ func main() {
 	for _, doc := range docs {
 		documentIndex.Insert(int(doc.Classification), doc.ID)
 	}
-	slog.Info("document index built", "count", len(docs))
+	slog.Info("scroll index built", "count", len(docs))
 
 	authService := service.NewAuthService(userRepo, sessionCache, cfg)
 	documentService := service.NewDocumentService(documentRepo, documentIndex, auditBuffer, auditRepo)
 	userService := service.NewUserService(userRepo, auditBuffer, auditRepo)
 	auditService := service.NewAuditService(auditRepo, auditBuffer)
 
-	if err := userService.SeedAdmin(cfg.AdminPassword); err != nil {
-		slog.Error("failed to seed admin user", "error", err)
+	if err := userService.SeedMayor(cfg.AdminPassword); err != nil {
+		slog.Error("failed to seed mayor", "error", err)
 		os.Exit(1)
 	}
 
@@ -99,16 +99,16 @@ func main() {
 	mux.Handle("GET /api/documents", api(http.HandlerFunc(documentHandler.List)))
 	mux.Handle("GET /api/documents/{id}", api(http.HandlerFunc(documentHandler.Get)))
 	mux.Handle("GET /api/catalog", api(http.HandlerFunc(documentHandler.Catalog)))
-	mux.Handle("POST /api/documents", api(middleware.RequireAnyRole(domain.RoleAdmin, domain.RoleAnalyst)(http.HandlerFunc(documentHandler.Create))))
-	mux.Handle("PUT /api/documents/{id}", api(middleware.RequireAnyRole(domain.RoleAdmin, domain.RoleAnalyst)(http.HandlerFunc(documentHandler.Update))))
-	mux.Handle("DELETE /api/documents/{id}", api(middleware.RequireRole(domain.RoleAdmin)(http.HandlerFunc(documentHandler.Delete))))
+	mux.Handle("POST /api/documents", api(middleware.RequireAnyRole(domain.RoleMayor, domain.RoleKeeper)(http.HandlerFunc(documentHandler.Create))))
+	mux.Handle("PUT /api/documents/{id}", api(middleware.RequireAnyRole(domain.RoleMayor, domain.RoleKeeper)(http.HandlerFunc(documentHandler.Update))))
+	mux.Handle("DELETE /api/documents/{id}", api(middleware.RequireRole(domain.RoleMayor)(http.HandlerFunc(documentHandler.Delete))))
 
-	mux.Handle("GET /api/users", api(middleware.RequireRole(domain.RoleAdmin)(http.HandlerFunc(userHandler.List))))
-	mux.Handle("POST /api/users", api(middleware.RequireRole(domain.RoleAdmin)(http.HandlerFunc(userHandler.Create))))
-	mux.Handle("PUT /api/users/{id}", api(middleware.RequireRole(domain.RoleAdmin)(http.HandlerFunc(userHandler.Update))))
-	mux.Handle("DELETE /api/users/{id}", api(middleware.RequireRole(domain.RoleAdmin)(http.HandlerFunc(userHandler.Delete))))
+	mux.Handle("GET /api/users", api(middleware.RequireRole(domain.RoleMayor)(http.HandlerFunc(userHandler.List))))
+	mux.Handle("POST /api/users", api(middleware.RequireRole(domain.RoleMayor)(http.HandlerFunc(userHandler.Create))))
+	mux.Handle("PUT /api/users/{id}", api(middleware.RequireRole(domain.RoleMayor)(http.HandlerFunc(userHandler.Update))))
+	mux.Handle("DELETE /api/users/{id}", api(middleware.RequireRole(domain.RoleMayor)(http.HandlerFunc(userHandler.Delete))))
 
-	mux.Handle("GET /api/audit", api(middleware.RequireRole(domain.RoleAdmin)(http.HandlerFunc(auditHandler.List))))
+	mux.Handle("GET /api/audit", api(middleware.RequireRole(domain.RoleMayor)(http.HandlerFunc(auditHandler.List))))
 
 	mux.HandleFunc("GET /health", healthHandler(db))
 
@@ -138,7 +138,7 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	slog.Info("flushing audit buffer", "count", auditBuffer.Size())
+	slog.Info("flushing town ledger", "count", auditBuffer.Size())
 	for _, entry := range auditBuffer.LastN(auditBuffer.Size()) {
 		e := entry
 		auditRepo.Save(&e)

@@ -21,6 +21,7 @@ type DocCreateModel struct {
 	title          string
 	content        string
 	classification int
+	faction        string
 	tags           string
 
 	step   int
@@ -29,11 +30,16 @@ type DocCreateModel struct {
 	result string
 }
 
+const tierCount = 6
+
+var tierKeys = []string{"1", "2", "3", "4", "5", "6"}
+
 func NewDocCreateModel(api *client.APIClient, user *domain.User) DocCreateModel {
 	return DocCreateModel{
 		apiClient:      api,
 		user:           user,
 		classification: 0,
+		faction:        string(user.Faction),
 	}
 }
 
@@ -95,7 +101,7 @@ func (m *DocCreateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				return m, func() tea.Msg {
-					doc, err := m.apiClient.CreateDocument(m.title, m.content, domain.ClearanceLevel(m.classification), tags)
+					doc, err := m.apiClient.CreateDocument(m.title, m.content, domain.ClearanceLevel(m.classification), domain.Faction(m.faction), tags)
 					if err != nil {
 						return err
 					}
@@ -123,28 +129,15 @@ func (m *DocCreateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.step = 2
 				}
 			}
-		case "1":
-			if m.step == 2 {
-				m.classification = 0
-			}
-		case "2":
-			if m.step == 2 {
-				m.classification = 1
-			}
-		case "3":
-			if m.step == 2 {
-				m.classification = 2
-			}
-		case "4":
-			if m.step == 2 {
-				m.classification = 3
-			}
-		case "5":
-			if m.step == 2 {
-				m.classification = 4
-			}
 		default:
-			if len(msg.Runes) == 1 {
+			key := msg.String()
+			if m.step == 2 {
+				for i, k := range tierKeys {
+					if key == k {
+						m.classification = i
+					}
+				}
+			} else if len(msg.Runes) == 1 {
 				switch m.step {
 				case 0:
 					if len(m.title) < 60 {
@@ -164,7 +157,7 @@ func (m *DocCreateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case *domain.Document:
 		m.done = true
-		m.result = styles.SuccessStyle.Render(fmt.Sprintf("Document created: %s", msg.Title))
+		m.result = styles.SuccessStyle.Render(fmt.Sprintf("Scroll scribed: %s", msg.Title))
 		return m, nil
 
 	case error:
@@ -179,9 +172,9 @@ func (m *DocCreateModel) View() string {
 	var sb strings.Builder
 
 	if m.done {
-		sb.WriteString(styles.DocTitle.Render("✅ Document Created") + "\n\n")
+		sb.WriteString(styles.DocTitle.Render("★ Scroll Scribed") + "\n\n")
 		sb.WriteString(m.result + "\n\n")
-		sb.WriteString(styles.DocMeta.Render("[Q] Back to Documents"))
+		sb.WriteString(styles.DocMeta.Render("[Q] Back to Scrolls"))
 		return lipgloss.Place(
 			m.width, m.height,
 			lipgloss.Center, lipgloss.Center,
@@ -189,7 +182,7 @@ func (m *DocCreateModel) View() string {
 		)
 	}
 
-	sb.WriteString(styles.DocTitle.Render("📝 Create Document") + "\n\n")
+	sb.WriteString(styles.DocTitle.Render("★ Scribe New Scroll") + "\n\n")
 
 	switch m.step {
 	case 0:
@@ -200,19 +193,19 @@ func (m *DocCreateModel) View() string {
 	case 2:
 		sb.WriteString(styles.DocPrompt.Render("Title: ") + styles.DocMeta.Render(m.title) + "\n")
 		sb.WriteString(styles.DocPrompt.Render("Content: ") + styles.DocMeta.Render(truncate(m.content, 40)) + "\n\n")
-		sb.WriteString(styles.DocPrompt.Render("Classification:\n"))
-		clears := []domain.ClearanceLevel{0, 1, 2, 3, 4}
-		for i, cle := range clears {
+		sb.WriteString(styles.DocPrompt.Render("Access Tier:\n"))
+		tiers := []domain.ClearanceLevel{domain.TierPublic, domain.TierCouncil, domain.TierGuild, domain.TierCorporate, domain.TierArcane, domain.TierJunimo}
+		for i, tier := range tiers {
 			marker := " "
 			if i == m.classification {
 				marker = "▶"
 			}
-			sb.WriteString(fmt.Sprintf("  %s %s  %s\n", marker, styles.ClearanceBadge(cle.String()), fmt.Sprintf("[%d]", i+1)))
+			sb.WriteString(fmt.Sprintf("  %s %s  %s\n", marker, styles.ClearanceBadge(tier.String()), fmt.Sprintf("[%d]", i+1)))
 		}
 	case 3:
 		sb.WriteString(styles.DocPrompt.Render("Title: ") + styles.DocMeta.Render(m.title) + "\n")
 		sb.WriteString(styles.DocPrompt.Render("Content: ") + styles.DocMeta.Render(truncate(m.content, 40)) + "\n")
-		sb.WriteString(styles.DocPrompt.Render("Classification: ") + styles.ClearanceBadge(domain.ClearanceLevel(m.classification).String()) + "\n\n")
+		sb.WriteString(styles.DocPrompt.Render("Tier: ") + styles.ClearanceBadge(domain.ClearanceLevel(m.classification).String()) + "\n\n")
 		sb.WriteString(styles.DocPrompt.Render("Tags (comma-separated): ") + m.tags + "_")
 	}
 

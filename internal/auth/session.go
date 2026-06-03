@@ -7,9 +7,10 @@ import (
 )
 
 type Session struct {
-	UserID    string
-	Username  string
-	Role      domain.Role
-	Clearance domain.ClearanceLevel
-	ExpiresAt time.Time
+	UserID    string                `json:"user_id"`
+	Username  string                `json:"username"`
+	Role      domain.Role           `json:"role"`
+	Clearance domain.ClearanceLevel `json:"tier"`
+	Faction   domain.Faction        `json:"faction"`
+	ExpiresAt time.Time             `json:"expires_at"`
 }

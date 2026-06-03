@@ -3,61 +3,73 @@ package domain
 type ClearanceLevel int
 
 const (
-	ClearancePublic       ClearanceLevel = 0
-	ClearanceRestricted   ClearanceLevel = 1
-	ClearanceConfidential ClearanceLevel = 2
-	ClearanceSecret       ClearanceLevel = 3
-	ClearanceTopSecret    ClearanceLevel = 4
+	TierPublic    ClearanceLevel = 0
+	TierCouncil   ClearanceLevel = 1
+	TierGuild     ClearanceLevel = 2
+	TierCorporate ClearanceLevel = 3
+	TierArcane    ClearanceLevel = 4
+	TierJunimo    ClearanceLevel = 5
 )
 
 func (c ClearanceLevel) String() string {
 	switch c {
-	case ClearancePublic:
-		return "PUBLIC"
-	case ClearanceRestricted:
-		return "RESTRICTED"
-	case ClearanceConfidential:
-		return "CONFIDENTIAL"
-	case ClearanceSecret:
-		return "SECRET"
-	case ClearanceTopSecret:
-		return "TOP SECRET"
+	case TierPublic:
+		return "PUBLIC NOTICE"
+	case TierCouncil:
+		return "COUNCIL EYES ONLY"
+	case TierGuild:
+		return "GUILD BUSINESS"
+	case TierCorporate:
+		return "CORPORATE ACCESS"
+	case TierArcane:
+		return "ARCANE KNOWLEDGE"
+	case TierJunimo:
+		return "JUNIMO SCRIPT"
 	default:
 		return "UNKNOWN"
 	}
 }
 
 func (c ClearanceLevel) Label() string {
-	labels := map[ClearanceLevel]string{
-		ClearancePublic:       "PUBLIC",
-		ClearanceRestricted:   "RESTRICTED",
-		ClearanceConfidential: "CONFIDENTIAL",
-		ClearanceSecret:       "SECRET",
-		ClearanceTopSecret:    "TOP SECRET",
-	}
-	return labels[c]
+	return c.String()
 }
 
 type Role string
 
 const (
-	RoleAdmin   Role = "admin"
-	RoleAnalyst Role = "analyst"
-	RoleViewer  Role = "viewer"
-	RoleIntern  Role = "intern"
+	RoleMayor     Role = "mayor"
+	RoleKeeper    Role = "keeper"
+	RoleVillager  Role = "villager"
+	RoleAssociate Role = "associate"
 )
 
 func MaxClearanceForRole(role Role) ClearanceLevel {
 	switch role {
-	case RoleAdmin:
-		return ClearanceTopSecret
-	case RoleAnalyst:
-		return ClearanceConfidential
-	case RoleViewer:
-		return ClearanceRestricted
-	case RoleIntern:
-		return ClearancePublic
+	case RoleMayor:
+		return TierJunimo
+	case RoleKeeper:
+		return TierArcane
+	case RoleVillager:
+		return TierCouncil
+	case RoleAssociate:
+		return TierPublic
 	default:
-		return ClearancePublic
+		return TierPublic
 	}
 }
+
+type Faction string
+
+const (
+	FactionMayorsOffice     Faction = "Mayor's Office"
+	FactionWizardsTower     Faction = "Wizard's Tower"
+	FactionJojaCorp         Faction = "Joja Corp"
+	FactionAdventurersGuild Faction = "Adventurer's Guild"
+	FactionHarveysClinic    Faction = "Harvey's Clinic"
+	FactionCommunityCenter  Faction = "Community Center"
+	FactionCarpentersShop   Faction = "Carpenter's Shop"
+	FactionMuseum           Faction = "Museum"
+	FactionBulletinBoard    Faction = "Bulletin Board"
+	FactionQisOffice        Faction = "Mr. Qi's Office"
+	FactionPierDocks        Faction = "Pier & Docks"
+)

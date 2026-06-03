@@ -30,7 +30,7 @@ type LoginModel struct {
 
 func NewLoginModel(api *client.APIClient) LoginModel {
 	u := textinput.New()
-	u.Placeholder = "admin"
+	u.Placeholder = "lewis"
 	u.Focus()
 	u.CharLimit = 32
 	u.Width = 30
@@ -108,8 +108,8 @@ func (m *LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *LoginModel) View() string {
-	title := styles.TitleStyle.Render("🔒 CLASSIFIED VAULT")
-	subtitle := styles.DocMeta.Render("Secure Access System")
+	title := styles.TitleStyle.Render("★ PELICAN TOWN ARCHIVES")
+	subtitle := styles.DocMeta.Render("Mayor's Office · Secure Record System")
 
 	var body strings.Builder
 	body.WriteString(fmt.Sprintf("\n  %s %s\n", styles.DocPrompt.Render("Username:"), m.username.View()))
@@ -123,7 +123,7 @@ func (m *LoginModel) View() string {
 		body.WriteString(styles.DocMeta.Render("  Authenticating...") + "\n")
 	}
 
-	body.WriteString(styles.DocMeta.Render("\n  [Enter] Login  [Tab] Switch  [q] Quit"))
+	body.WriteString(styles.DocMeta.Render("\n  [Enter] Sign In  [Tab] Switch  [Esc] Quit"))
 
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		title,
