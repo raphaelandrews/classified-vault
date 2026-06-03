@@ -1,0 +1,36 @@
+# Binaries
+/bin/
+/classified-vault
+/classified-vault.exe
+/server
+
+# Database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Environment
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependency directories
+vendor/
+
+# Test coverage
+*.out
+coverage.html
+
+# Build output
+/tmp/
