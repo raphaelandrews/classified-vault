@@ -12,7 +12,7 @@ import (
 )
 
 type AccessDeniedModel struct {
-	doc         *domain.Document
+	title       string
 	userCle     domain.ClearanceLevel
 	requiredCle domain.ClearanceLevel
 	width       int
@@ -21,15 +21,15 @@ type AccessDeniedModel struct {
 
 func NewAccessDeniedModel(msg DocAccessDeniedMsg) AccessDeniedModel {
 	return AccessDeniedModel{
-		doc:         msg.Doc,
+		title:       msg.Title,
 		userCle:     msg.UserCle,
 		requiredCle: msg.RequiredCle,
 	}
 }
 
-func (m AccessDeniedModel) Init() tea.Cmd { return nil }
+func (m *AccessDeniedModel) Init() tea.Cmd { return nil }
 
-func (m AccessDeniedModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *AccessDeniedModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -37,7 +37,7 @@ func (m AccessDeniedModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyMsg:
 		switch strings.ToUpper(msg.String()) {
-		case "Q", "ENTER", "ESC", "BACKSPACE":
+		case "H", "Q", "ENTER":
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDocList} }
 		case "CTRL+C":
 			return m, tea.Quit
@@ -46,7 +46,7 @@ func (m AccessDeniedModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m AccessDeniedModel) View() string {
+func (m *AccessDeniedModel) View() string {
 	var sb strings.Builder
 
 	sb.WriteString("\n\n")
@@ -55,10 +55,10 @@ func (m AccessDeniedModel) View() string {
 	sb.WriteString(styles.DocMeta.Render("    Insufficient clearance level.") + "\n\n")
 	sb.WriteString(fmt.Sprintf("    Your clearance:     %s\n", styles.ClearanceBadge(m.userCle.String())))
 	sb.WriteString(fmt.Sprintf("    Required:           %s\n", styles.ClearanceBadge(m.requiredCle.String())))
-	sb.WriteString(fmt.Sprintf("    Document:           %s\n", styles.DocMeta.Render(m.doc.Title)))
+	sb.WriteString(fmt.Sprintf("    Document:           %s\n", styles.DocMeta.Render(m.title)))
 	sb.WriteString("\n")
 	sb.WriteString(styles.DocMeta.Render("    This attempt has been logged.") + "\n\n")
-	sb.WriteString(styles.DocMeta.Render("        [Q] Back"))
+	sb.WriteString(styles.DocMeta.Render("        [h] Back"))
 
 	return lipgloss.Place(
 		m.width, m.height,

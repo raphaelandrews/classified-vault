@@ -3,14 +3,18 @@ package styles
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	Primary    = lipgloss.Color("#7C3AED")
-	Accent     = lipgloss.Color("#A78BFA")
-	Success    = lipgloss.Color("#10B981")
-	Error      = lipgloss.Color("#EF4444")
-	Warning    = lipgloss.Color("#F59E0B")
-	Dimmed     = lipgloss.Color("#6B7280")
-	Background = lipgloss.Color("#1F2937")
-	Foreground = lipgloss.Color("#F9FAFB")
+	Primary    = lipgloss.Color("#A550DF")
+	Accent     = lipgloss.Color("#C084FC")
+	Success    = lipgloss.Color("#34D399")
+	Error      = lipgloss.Color("#FB7185")
+	Warning    = lipgloss.Color("#FBBF24")
+	Selected   = lipgloss.Color("#FDE68A")
+	Foreground = lipgloss.Color("#F1F5F9")
+	Dimmed     = lipgloss.Color("#94A3B8")
+	BorderCol  = lipgloss.Color("#334155")
+	RowEven    = lipgloss.Color("#E2E8F0")
+	RowOdd     = lipgloss.Color("#CBD5E1")
+	DarkText   = lipgloss.Color("#1F1C23")
 )
 
 var (
@@ -30,8 +34,9 @@ var (
 			Padding(1, 2)
 
 	SelectedStyle = lipgloss.NewStyle().
-			Foreground(Foreground).
-			Background(Primary)
+			Foreground(DarkText).
+			Background(Selected).
+			Bold(true)
 
 	ErrorStyle = lipgloss.NewStyle().
 			Foreground(Error).
@@ -48,22 +53,21 @@ var (
 
 	StatusBarStyle = lipgloss.NewStyle().
 			Foreground(Dimmed).
-			Background(Background).
 			Padding(0, 1)
 )
 
 func ClearanceBadge(level string) string {
 	switch level {
 	case "PUBLIC":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#9CA3AF")).Render("[ PUBLIC     ]")
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#94A3B8")).Render("[ PUBLIC     ]")
 	case "RESTRICTED":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#3B82F6")).Render("[ RESTRICTED ]")
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#60A5FA")).Render("[ RESTRICTED ]")
 	case "CONFIDENTIAL":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).Render("[ CONFIDENTIAL]")
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#FBBF24")).Render("[ CONFIDENTIAL]")
 	case "SECRET":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#F97316")).Render("[ SECRET     ]")
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#FB923C")).Render("[ SECRET     ]")
 	case "TOP SECRET":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444")).Render("[ TOP SECRET ]")
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#F87171")).Render("[ TOP SECRET ]")
 	default:
 		return lipgloss.NewStyle().Foreground(Dimmed).Render("[ UNKNOWN    ]")
 	}

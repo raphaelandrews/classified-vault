@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 
 	"classified-vault/internal/domain"
 	"classified-vault/tui/client"
@@ -13,7 +14,7 @@ import (
 )
 
 type DocumentListModel struct {
-	docs      []*domain.Document
+	docs      []client.CatalogEntry
 	cursor    int
 	err       string
 	apiClient *client.APIClient
@@ -23,11 +24,11 @@ type DocumentListModel struct {
 }
 
 type DocSelectedMsg struct {
-	Doc *domain.Document
+	DocID string
 }
 
 type DocAccessDeniedMsg struct {
-	Doc         *domain.Document
+	Title       string
 	UserCle     domain.ClearanceLevel
 	RequiredCle domain.ClearanceLevel
 }
@@ -39,73 +40,84 @@ func NewDocumentListModel(api *client.APIClient, user *domain.User) DocumentList
 	}
 }
 
-func (m DocumentListModel) Init() tea.Cmd {
+func (m *DocumentListModel) Init() tea.Cmd {
 	return m.loadDocs
 }
 
-func (m DocumentListModel) loadDocs() tea.Msg {
-	docs, err := m.apiClient.ListDocuments()
+func (m *DocumentListModel) loadDocs() tea.Msg {
+	entries, err := m.apiClient.ListCatalog()
 	if err != nil {
-		return fmt.Errorf("failed to load documents: %w", err)
+		return fmt.Errorf("failed to load catalog: %w", err)
 	}
-	return docs
+	return entries
 }
 
-func (m DocumentListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *DocumentListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		return m, nil
-	case []*domain.Document:
+
+	case []client.CatalogEntry:
 		m.docs = msg
 		m.err = ""
 		return m, nil
+
 	case error:
 		m.err = msg.Error()
 		return m, nil
+
 	case tea.KeyMsg:
 		switch strings.ToUpper(msg.String()) {
 		case "UP", "K":
 			if m.cursor > 0 {
 				m.cursor--
+			} else {
+				m.cursor = len(m.docs) - 1
 			}
 		case "DOWN", "J":
 			if m.cursor < len(m.docs)-1 {
 				m.cursor++
+			} else {
+				m.cursor = 0
 			}
-		case "ENTER":
-			if len(m.docs) > 0 {
-				doc := m.docs[m.cursor]
-				if m.user.Clearance >= doc.Classification {
-					return m, func() tea.Msg { return DocSelectedMsg{Doc: doc} }
+		case "ENTER", "L":
+			if len(m.docs) > 0 && m.cursor < len(m.docs) {
+				entry := m.docs[m.cursor]
+				docCle := domain.ClearanceLevel(entry.Classification)
+				if m.user.Clearance >= docCle {
+					return m, func() tea.Msg { return DocSelectedMsg{DocID: entry.ID} }
 				}
 				return m, func() tea.Msg {
 					return DocAccessDeniedMsg{
-						Doc:         doc,
+						Title:       entry.Title,
 						UserCle:     m.user.Clearance,
-						RequiredCle: doc.Classification,
+						RequiredCle: docCle,
 					}
 				}
 			}
-		case "N":
+		case "A":
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDocCreate} }
-		case "Q":
+		case "H", "Q":
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDashboard} }
-		case "CTRL+C", "ESC":
+		case "CTRL+C":
 			return m, tea.Quit
 		case "R":
 			return m, m.loadDocs
 		}
 	}
+
 	return m, nil
 }
 
-func (m DocumentListModel) View() string {
-	header := fmt.Sprintf("📁 DOCUMENTS — clearance: %s",
-		styles.ClearanceBadge(m.user.Clearance.String()))
-
+func (m *DocumentListModel) View() string {
 	var sb strings.Builder
+
+	header := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(styles.Primary).
+		Render(fmt.Sprintf("📁 DOCUMENTS — clearance: %s", styles.ClearanceBadge(m.user.Clearance.String())))
 	sb.WriteString(header + "\n\n")
 
 	if m.err != "" {
@@ -113,35 +125,52 @@ func (m DocumentListModel) View() string {
 	}
 
 	if len(m.docs) == 0 {
-		sb.WriteString(styles.DocMeta.Render("  No documents accessible at your clearance level.\n"))
+		sb.WriteString(styles.DocMeta.Render("  No documents found.\n"))
 	} else {
-		for i, doc := range m.docs {
-			cursor := " "
-			if i == m.cursor {
-				cursor = "▶"
-			}
-			title := doc.Title
-			if m.user.Clearance < doc.Classification {
-				title = "[BLOCKED] " + title
+		t := table.New().
+			Border(lipgloss.NormalBorder()).
+			BorderStyle(lipgloss.NewStyle().Foreground(styles.BorderCol)).
+			Width(m.width-8).
+			StyleFunc(func(row, col int) lipgloss.Style {
+				base := lipgloss.NewStyle().Padding(0, 1)
+				switch {
+				case row == table.HeaderRow:
+					return base.Foreground(styles.Foreground).Bold(true)
+				case row == m.cursor:
+					return base.Foreground(styles.DarkText).Background(styles.Selected).Bold(true)
+				case row%2 == 0:
+					return base.Foreground(styles.RowEven)
+				default:
+					return base.Foreground(styles.RowOdd)
+				}
+			}).
+			Headers("", "TITLE", "CLASSIFICATION", "DATE")
+
+		for i, entry := range m.docs {
+			docCle := domain.ClearanceLevel(entry.Classification)
+			marker := fmt.Sprintf("%d", i+1)
+			title := entry.Title
+			cls := styles.ClearanceBadge(docCle.String())
+			date := styles.DocMeta.Render(entry.CreatedAt[:10])
+
+			if m.user.Clearance < docCle {
+				marker = "🔒"
 				title = styles.DocMeta.Render(title)
+				cls = styles.DocMeta.Render("[ RESTRICTED ]")
 			}
-			line := fmt.Sprintf("%s %-50s %s %s",
-				cursor, title,
-				styles.ClearanceBadge(doc.Classification.String()),
-				styles.DocMeta.Render(doc.CreatedAt.Format("2006-01-02")),
-			)
 			if i == m.cursor {
-				line = styles.SelectedStyle.Render(line)
+				marker = "▶"
 			}
-			sb.WriteString(line + "\n")
+
+			t.Row(marker, title, cls, date)
 		}
+
+		sb.WriteString(t.Render())
 	}
 
-	sb.WriteString(styles.DocMeta.Render("\n[Enter] Open  [N] New  [R] Refresh  [Q] Back"))
+	content := styles.BorderStyle.Render(sb.String())
+	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Center, content)
+	footer := styles.StatusBarStyle.Width(m.width).Render("[j/k] Move  [l] Open  [a] New  [h] Back  [r] Refresh")
 
-	return lipgloss.Place(
-		m.width, m.height,
-		lipgloss.Center, lipgloss.Center,
-		styles.BorderStyle.Render(sb.String()),
-	)
+	return main + "\n" + footer
 }

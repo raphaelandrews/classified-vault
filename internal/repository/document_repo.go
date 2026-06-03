@@ -138,3 +138,40 @@ func (r *DocumentRepository) Delete(id string) error {
 	_, err := r.db.Exec(`DELETE FROM documents WHERE id = ?`, id)
 	return err
 }
+
+type DocMetadata struct {
+	ID             string    `json:"id"`
+	Title          string    `json:"title"`
+	Classification int       `json:"classification"`
+	Status         string    `json:"status"`
+	Tags           []string  `json:"tags"`
+	CreatedBy      string    `json:"created_by"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+func (r *DocumentRepository) FindAllMetadata() ([]DocMetadata, error) {
+	rows, err := r.db.Query(
+		`SELECT id, title, classification, status, tags, created_by, created_at, updated_at
+		 FROM documents ORDER BY created_at DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var docs []DocMetadata
+	for rows.Next() {
+		var d DocMetadata
+		var tagsJSON string
+		if err := rows.Scan(&d.ID, &d.Title, &d.Classification, &d.Status, &tagsJSON, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt); err != nil {
+			return nil, err
+		}
+		json.Unmarshal([]byte(tagsJSON), &d.Tags)
+		if d.Tags == nil {
+			d.Tags = []string{}
+		}
+		docs = append(docs, d)
+	}
+	return docs, rows.Err()
+}

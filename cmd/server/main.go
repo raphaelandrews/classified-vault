@@ -98,6 +98,7 @@ func main() {
 
 	mux.Handle("GET /api/documents", api(http.HandlerFunc(documentHandler.List)))
 	mux.Handle("GET /api/documents/{id}", api(http.HandlerFunc(documentHandler.Get)))
+	mux.Handle("GET /api/catalog", api(http.HandlerFunc(documentHandler.Catalog)))
 	mux.Handle("POST /api/documents", api(middleware.RequireAnyRole(domain.RoleAdmin, domain.RoleAnalyst)(http.HandlerFunc(documentHandler.Create))))
 	mux.Handle("PUT /api/documents/{id}", api(middleware.RequireAnyRole(domain.RoleAdmin, domain.RoleAnalyst)(http.HandlerFunc(documentHandler.Update))))
 	mux.Handle("DELETE /api/documents/{id}", api(middleware.RequireRole(domain.RoleAdmin)(http.HandlerFunc(documentHandler.Delete))))

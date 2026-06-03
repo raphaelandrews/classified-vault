@@ -6,6 +6,7 @@ import (
 
 	"classified-vault/internal/auth"
 	"classified-vault/internal/domain"
+	"classified-vault/internal/repository"
 )
 
 type DocumentService interface {
@@ -14,6 +15,7 @@ type DocumentService interface {
 	Create(session auth.Session, doc *domain.Document) (*domain.Document, error)
 	Update(session auth.Session, id string, doc *domain.Document) (*domain.Document, error)
 	Delete(session auth.Session, id string) error
+	Catalog() ([]repository.DocMetadata, error)
 }
 
 type DocumentHandler struct {
@@ -129,4 +131,19 @@ func (h *DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusNoContent, nil)
+}
+
+func (h *DocumentHandler) Catalog(w http.ResponseWriter, r *http.Request) {
+	session := requireSession(w, r)
+	if session == nil {
+		return
+	}
+
+	docs, err := h.service.Catalog()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list catalog"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, docs)
 }

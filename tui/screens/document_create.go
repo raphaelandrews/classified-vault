@@ -37,9 +37,9 @@ func NewDocCreateModel(api *client.APIClient, user *domain.User) DocCreateModel 
 	}
 }
 
-func (m DocCreateModel) Init() tea.Cmd { return nil }
+func (m *DocCreateModel) Init() tea.Cmd { return nil }
 
-func (m DocCreateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *DocCreateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -103,9 +103,25 @@ func (m DocCreateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "backspace":
-			if m.step > 0 {
-				m.step--
-				m.err = ""
+			switch m.step {
+			case 0:
+				if len(m.title) > 0 {
+					m.title = m.title[:len(m.title)-1]
+				}
+			case 1:
+				if len(m.content) > 0 {
+					m.content = m.content[:len(m.content)-1]
+				} else {
+					m.step = 0
+				}
+			case 2:
+				m.step = 1
+			case 3:
+				if len(m.tags) > 0 {
+					m.tags = m.tags[:len(m.tags)-1]
+				} else {
+					m.step = 2
+				}
 			}
 		case "1":
 			if m.step == 2 {
@@ -159,7 +175,7 @@ func (m DocCreateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m DocCreateModel) View() string {
+func (m *DocCreateModel) View() string {
 	var sb strings.Builder
 
 	if m.done {

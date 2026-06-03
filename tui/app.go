@@ -12,14 +12,14 @@ type Model struct {
 
 	apiClient *client.APIClient
 
-	loginModel        screens.LoginModel
-	dashModel         screens.DashboardModel
-	docListModel      screens.DocumentListModel
-	docViewModel      screens.DocumentViewModel
-	docCreateModel    screens.DocCreateModel
-	accessDeniedModel screens.AccessDeniedModel
-	usersModel        screens.UsersModel
-	auditModel        screens.AuditLogModel
+	loginModel        *screens.LoginModel
+	dashModel         *screens.DashboardModel
+	docListModel      *screens.DocumentListModel
+	docViewModel      *screens.DocumentViewModel
+	docCreateModel    *screens.DocCreateModel
+	accessDeniedModel *screens.AccessDeniedModel
+	usersModel        *screens.UsersModel
+	auditModel        *screens.AuditLogModel
 
 	current tea.Model
 	width   int
@@ -32,7 +32,8 @@ func New(serverURL string) *Model {
 		screen:    screens.ScreenLogin,
 		apiClient: api,
 	}
-	m.loginModel = screens.NewLoginModel(api)
+	lm := screens.NewLoginModel(api)
+	m.loginModel = &lm
 	m.current = m.loginModel
 	return m
 }
@@ -48,7 +49,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 
 	case screens.LoginMsg:
-		m.dashModel = screens.NewDashboardModel(m.apiClient, msg.User)
+		dm := screens.NewDashboardModel(m.apiClient, msg.User)
+		m.dashModel = &dm
 		m.screen = screens.ScreenDashboard
 		m.current = m.dashModel
 		return m, m.current.Init()
@@ -57,13 +59,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleNavigate(msg)
 
 	case screens.DocSelectedMsg:
-		m.docViewModel = screens.NewDocumentViewModel(msg.Doc, m.apiClient.User)
+		doc, err := m.apiClient.GetDocument(msg.DocID)
+		if err != nil {
+			return m, nil
+		}
+		dvm := screens.NewDocumentViewModel(doc, m.apiClient.User)
+		m.docViewModel = &dvm
 		m.screen = screens.ScreenDocView
 		m.current = m.docViewModel
 		return m, m.current.Init()
 
 	case screens.DocAccessDeniedMsg:
-		m.accessDeniedModel = screens.NewAccessDeniedModel(msg)
+		adm := screens.NewAccessDeniedModel(msg)
+		m.accessDeniedModel = &adm
 		m.screen = screens.ScreenAccessDenied
 		m.current = m.accessDeniedModel
 		return m, m.current.Init()
@@ -81,32 +89,38 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) handleNavigate(msg screens.NavigateMsg) (tea.Model, tea.Cmd) {
 	switch msg.Screen {
 	case screens.ScreenLogin:
-		m.loginModel = screens.NewLoginModel(m.apiClient)
+		lm := screens.NewLoginModel(m.apiClient)
+		m.loginModel = &lm
 		m.screen = screens.ScreenLogin
 		m.current = m.loginModel
 
 	case screens.ScreenDashboard:
-		m.dashModel = screens.NewDashboardModel(m.apiClient, m.apiClient.User)
+		dm := screens.NewDashboardModel(m.apiClient, m.apiClient.User)
+		m.dashModel = &dm
 		m.screen = screens.ScreenDashboard
 		m.current = m.dashModel
 
 	case screens.ScreenDocList:
-		m.docListModel = screens.NewDocumentListModel(m.apiClient, m.apiClient.User)
+		dlm := screens.NewDocumentListModel(m.apiClient, m.apiClient.User)
+		m.docListModel = &dlm
 		m.screen = screens.ScreenDocList
 		m.current = m.docListModel
 
 	case screens.ScreenDocCreate:
-		m.docCreateModel = screens.NewDocCreateModel(m.apiClient, m.apiClient.User)
+		dcm := screens.NewDocCreateModel(m.apiClient, m.apiClient.User)
+		m.docCreateModel = &dcm
 		m.screen = screens.ScreenDocCreate
 		m.current = m.docCreateModel
 
 	case screens.ScreenUsers:
-		m.usersModel = screens.NewUsersModel(m.apiClient)
+		um := screens.NewUsersModel(m.apiClient)
+		m.usersModel = &um
 		m.screen = screens.ScreenUsers
 		m.current = m.usersModel
 
 	case screens.ScreenAudit:
-		m.auditModel = screens.NewAuditLogModel(m.apiClient)
+		am := screens.NewAuditLogModel(m.apiClient)
+		m.auditModel = &am
 		m.screen = screens.ScreenAudit
 		m.current = m.auditModel
 	}

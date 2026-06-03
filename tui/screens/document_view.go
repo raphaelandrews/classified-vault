@@ -25,9 +25,9 @@ func NewDocumentViewModel(doc *domain.Document, user *domain.User) DocumentViewM
 	}
 }
 
-func (m DocumentViewModel) Init() tea.Cmd { return nil }
+func (m *DocumentViewModel) Init() tea.Cmd { return nil }
 
-func (m DocumentViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *DocumentViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -35,7 +35,7 @@ func (m DocumentViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyMsg:
 		switch strings.ToUpper(msg.String()) {
-		case "Q", "ESC", "BACKSPACE":
+		case "H", "Q":
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDocList} }
 		case "CTRL+C":
 			return m, tea.Quit
@@ -44,7 +44,7 @@ func (m DocumentViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m DocumentViewModel) View() string {
+func (m *DocumentViewModel) View() string {
 	header := fmt.Sprintf("📄 %s", styles.DocTitle.Render(m.doc.Title))
 
 	var sb strings.Builder
@@ -66,13 +66,11 @@ func (m DocumentViewModel) View() string {
 	sb.WriteString("\n" + lipgloss.NewStyle().
 		Width(60).
 		MaxHeight(20).
-		Render(m.doc.Content) + "\n")
+		Render(m.doc.Content))
 
-	sb.WriteString(styles.DocMeta.Render("\n[Q] Back  [Esc] Quit"))
+	content := styles.BorderStyle.Render(sb.String())
+	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Center, content)
+	footer := styles.StatusBarStyle.Width(m.width).Render("[h] Back  [q] Quit")
 
-	return lipgloss.Place(
-		m.width, m.height,
-		lipgloss.Center, lipgloss.Center,
-		styles.BorderStyle.Render(sb.String()),
-	)
+	return main + "\n" + footer
 }

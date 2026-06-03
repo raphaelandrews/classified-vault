@@ -71,3 +71,26 @@ func (c *APIClient) DeleteDocument(id string) error {
 	_, _, err := c.do("DELETE", "/api/documents/"+id, nil)
 	return err
 }
+
+type CatalogEntry struct {
+	ID             string   `json:"id"`
+	Title          string   `json:"title"`
+	Classification int      `json:"classification"`
+	Status         string   `json:"status"`
+	Tags           []string `json:"tags"`
+	CreatedBy      string   `json:"created_by"`
+	CreatedAt      string   `json:"created_at"`
+	UpdatedAt      string   `json:"updated_at"`
+}
+
+func (c *APIClient) ListCatalog() ([]CatalogEntry, error) {
+	_, body, err := c.do("GET", "/api/catalog", nil)
+	if err != nil {
+		return nil, err
+	}
+	var entries []CatalogEntry
+	if err := json.Unmarshal(body, &entries); err != nil {
+		return nil, fmt.Errorf("unmarshal catalog: %w", err)
+	}
+	return entries, nil
+}

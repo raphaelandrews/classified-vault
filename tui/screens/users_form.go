@@ -42,10 +42,27 @@ func (m *UsersModel) updateAddForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.err = ""
 	case "backspace":
-		if m.addStep > 0 {
-			m.addStep--
-		} else {
-			m.adding = false
+		switch m.addStep {
+		case 0:
+			if len(m.addUser) > 0 {
+				m.addUser = m.addUser[:len(m.addUser)-1]
+			} else {
+				m.adding = false
+			}
+		case 1:
+			if len(m.addEmail) > 0 {
+				m.addEmail = m.addEmail[:len(m.addEmail)-1]
+			} else {
+				m.addStep = 0
+			}
+		case 2:
+			if len(m.addPass) > 0 {
+				m.addPass = m.addPass[:len(m.addPass)-1]
+			} else {
+				m.addStep = 1
+			}
+		case 3:
+			m.addStep = 2
 		}
 	case "1", "2", "3", "4":
 		if m.addStep == 3 {
@@ -70,7 +87,7 @@ func (m *UsersModel) updateAddForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m UsersModel) viewAddForm() string {
+func (m *UsersModel) viewAddForm() string {
 	var sb strings.Builder
 	sb.WriteString(styles.DocTitle.Render("➕ Add User") + "\n\n")
 

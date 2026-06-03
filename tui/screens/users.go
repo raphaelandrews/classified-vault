@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 
 	"classified-vault/internal/domain"
 	"classified-vault/tui/client"
@@ -36,11 +37,11 @@ func NewUsersModel(api *client.APIClient) UsersModel {
 	}
 }
 
-func (m UsersModel) Init() tea.Cmd {
+func (m *UsersModel) Init() tea.Cmd {
 	return m.loadUsers
 }
 
-func (m UsersModel) loadUsers() tea.Msg {
+func (m *UsersModel) loadUsers() tea.Msg {
 	users, err := m.apiClient.ListUsers()
 	if err != nil {
 		return fmt.Errorf("failed to load users: %w", err)
@@ -48,7 +49,7 @@ func (m UsersModel) loadUsers() tea.Msg {
 	return users
 }
 
-func (m UsersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *UsersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -66,13 +67,56 @@ func (m UsersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		if m.addDone != "" {
-			m.addDone = ""
+		if m.adding {
+			return m.updateAddForm(msg)
+		}
+		if m.err != "" && strings.Contains(m.err, "user created:") {
+			m.err = ""
 			m.adding = false
 			m.addUser = ""
 			m.addEmail = ""
 			m.addPass = ""
 			return m, m.loadUsers
+		}
+
+		switch strings.ToUpper(msg.String()) {
+		case "UP", "K":
+			if m.cursor > 0 {
+				m.cursor--
+			} else if len(m.users) > 0 {
+				m.cursor = len(m.users) - 1
+			}
+		case "DOWN", "J":
+			if m.cursor < len(m.users)-1 {
+				m.cursor++
+			} else {
+				m.cursor = 0
+			}
+		case "A":
+			m.adding = true
+			m.addStep = 0
+			m.addUser = ""
+			m.addEmail = ""
+			m.addPass = ""
+			m.addRole = 3
+			return m, nil
+		case "D":
+			if m.cursor < len(m.users) {
+				user := m.users[m.cursor]
+				return m, func() tea.Msg {
+					err := m.apiClient.DeleteUser(user.ID)
+					if err != nil {
+						return err
+					}
+					return NavigateMsg{Screen: ScreenUsers}
+				}
+			}
+		case "R":
+			return m, m.loadUsers
+		case "H", "Q":
+			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDashboard} }
+		case "CTRL+C":
+			return m, tea.Quit
 		}
 
 		if m.adding {
@@ -83,10 +127,14 @@ func (m UsersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "UP", "K":
 			if m.cursor > 0 {
 				m.cursor--
+			} else {
+				m.cursor = len(m.users) - 1
 			}
 		case "DOWN", "J":
 			if m.cursor < len(m.users)-1 {
 				m.cursor++
+			} else {
+				m.cursor = 0
 			}
 		case "N":
 			m.adding = true
@@ -116,7 +164,7 @@ func (m UsersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m UsersModel) View() string {
+func (m *UsersModel) View() string {
 	var sb strings.Builder
 
 	if m.addDone != "" {
@@ -133,28 +181,46 @@ func (m UsersModel) View() string {
 		sb.WriteString(styles.ErrorStyle.Render(m.err) + "\n")
 	}
 
-	for i, u := range m.users {
-		cursor := " "
-		if i == m.cursor {
-			cursor = "▶"
+	if len(m.users) == 0 {
+		sb.WriteString(styles.DocMeta.Render("  No users found.\n"))
+	} else {
+		t := table.New().
+			Border(lipgloss.NormalBorder()).
+			BorderStyle(lipgloss.NewStyle().Foreground(styles.BorderCol)).
+			Width(m.width-8).
+			StyleFunc(func(row, col int) lipgloss.Style {
+				base := lipgloss.NewStyle().Padding(0, 1)
+				switch {
+				case row == table.HeaderRow:
+					return base.Foreground(styles.Foreground).Bold(true)
+				case row == m.cursor:
+					return base.Foreground(styles.DarkText).Background(styles.Selected).Bold(true)
+				case row%2 == 0:
+					return base.Foreground(styles.RowEven)
+				default:
+					return base.Foreground(styles.RowOdd)
+				}
+			}).
+			Headers("", "USERNAME", "ROLE", "CLEARANCE", "STATUS")
+
+		for i, u := range m.users {
+			marker := fmt.Sprintf("%d", i+1)
+			if i == m.cursor {
+				marker = "▶"
+			}
+			status := ""
+			if !u.Active {
+				status = "INACTIVE"
+			}
+			t.Row(marker, u.Username, string(u.Role), styles.ClearanceBadge(u.Clearance.String()), status)
 		}
-		active := ""
-		if !u.Active {
-			active = styles.DocMeta.Render(" [INACTIVE]")
-		}
-		line := fmt.Sprintf("%s %-20s %-12s %s%s",
-			cursor, u.Username, u.Role, styles.ClearanceBadge(u.Clearance.String()), active)
-		if i == m.cursor {
-			line = styles.SelectedStyle.Render(line)
-		}
-		sb.WriteString(line + "\n")
+
+		sb.WriteString(t.Render())
 	}
 
-	sb.WriteString(styles.DocMeta.Render("\n[N] Add User  [Del] Delete  [R] Refresh  [Q] Back"))
+	content := styles.BorderStyle.Render(sb.String())
+	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Center, content)
+	footer := styles.StatusBarStyle.Width(m.width).Render("[j/k] Move  [a] Add  [d] Delete  [r] Refresh  [h] Back")
 
-	return lipgloss.Place(
-		m.width, m.height,
-		lipgloss.Center, lipgloss.Center,
-		styles.BorderStyle.Render(sb.String()),
-	)
+	return main + "\n" + footer
 }

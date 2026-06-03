@@ -172,6 +172,10 @@ func (s *DocumentService) Delete(session auth.Session, id string) error {
 	return nil
 }
 
+func (s *DocumentService) Catalog() ([]repository.DocMetadata, error) {
+	return s.repo.FindAllMetadata()
+}
+
 func (s *DocumentService) logAudit(log domain.AuditLog) {
 	log.ID = uuid.New().String()
 	log.Timestamp = time.Now()

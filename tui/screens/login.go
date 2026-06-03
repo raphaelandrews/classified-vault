@@ -49,11 +49,11 @@ func NewLoginModel(api *client.APIClient) LoginModel {
 	}
 }
 
-func (m LoginModel) Init() tea.Cmd {
+func (m *LoginModel) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-func (m LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -107,7 +107,7 @@ func (m LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m LoginModel) View() string {
+func (m *LoginModel) View() string {
 	title := styles.TitleStyle.Render("🔒 CLASSIFIED VAULT")
 	subtitle := styles.DocMeta.Render("Secure Access System")
 
@@ -123,7 +123,7 @@ func (m LoginModel) View() string {
 		body.WriteString(styles.DocMeta.Render("  Authenticating...") + "\n")
 	}
 
-	body.WriteString(styles.DocMeta.Render("\n  [Enter] Login  [Tab] Switch  [Esc] Quit"))
+	body.WriteString(styles.DocMeta.Render("\n  [Enter] Login  [Tab] Switch  [q] Quit"))
 
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		title,

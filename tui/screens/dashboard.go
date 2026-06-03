@@ -27,7 +27,7 @@ func NewDashboardModel(api *client.APIClient, user *domain.User) DashboardModel 
 	}
 }
 
-func (m DashboardModel) Init() tea.Cmd {
+func (m *DashboardModel) Init() tea.Cmd {
 	return func() tea.Msg {
 		docs, err := m.apiClient.ListDocuments()
 		if err != nil {
@@ -37,7 +37,7 @@ func (m DashboardModel) Init() tea.Cmd {
 	}
 }
 
-func (m DashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *DashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -50,23 +50,23 @@ func (m DashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch strings.ToUpper(msg.String()) {
 		case "D":
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDocList} }
-		case "N":
+		case "A":
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDocCreate} }
 		case "U":
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenUsers} }
-		case "A":
+		case "L":
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenAudit} }
-		case "Q":
+		case "Q", "H":
 			m.apiClient.Logout()
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenLogin} }
-		case "CTRL+C", "ESC":
+		case "CTRL+C":
 			return m, tea.Quit
 		}
 	}
 	return m, nil
 }
 
-func (m DashboardModel) View() string {
+func (m *DashboardModel) View() string {
 	header := fmt.Sprintf("🔒 CLASSIFIED VAULT    User: %s  [%s] [%s]",
 		styles.SuccessStyle.Render(m.user.Username),
 		styles.ClearanceBadge(m.user.Clearance.String()),
@@ -79,7 +79,7 @@ func (m DashboardModel) View() string {
 	sb.WriteString(styles.BorderStyle.Render(
 		styles.DocTitle.Render(fmt.Sprintf("📁 DOCUMENTS (%d accessible)", m.docCount))+"\n"+
 			styles.DocPrompt.Render("[D]")+" List Documents\n"+
-			styles.DocPrompt.Render("[N]")+" New Document",
+			styles.DocPrompt.Render("[A]")+" New Document",
 	) + "\n\n")
 
 	if m.user.Role == domain.RoleAdmin {
@@ -91,15 +91,12 @@ func (m DashboardModel) View() string {
 	} else if m.user.Role == domain.RoleAnalyst {
 		sb.WriteString(styles.BorderStyle.Render(
 			styles.DocTitle.Render("⚙ ANALYST")+"\n"+
-				styles.DocPrompt.Render("[N]")+" Create Documents",
+				styles.DocPrompt.Render("[A]")+" Create Documents",
 		) + "\n\n")
 	}
 
-	sb.WriteString(styles.DocMeta.Render("[Q] Logout  [Esc] Quit"))
+	main := lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Center, sb.String())
+	footer := styles.StatusBarStyle.Width(m.width).Render("[d] Documents  [a] New Doc  [u] Users  [l] Audit  [q] Logout")
 
-	return lipgloss.Place(
-		m.width, m.height,
-		lipgloss.Center, lipgloss.Center,
-		sb.String(),
-	)
+	return main + "\n" + footer
 }
