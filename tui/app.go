@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -22,6 +23,7 @@ type Model struct {
 	docListModel      *screens.DocumentListModel
 	docViewModel      *screens.DocumentViewModel
 	docCreateModel    *screens.DocCreateModel
+	docEditModel      *screens.DocEditModel
 	accessDeniedModel *screens.AccessDeniedModel
 	usersModel        *screens.UsersModel
 	auditModel        *screens.AuditLogModel
@@ -31,7 +33,8 @@ type Model struct {
 	height   int
 	themeIdx int
 
-	confirm *screens.ConfirmPromptMsg
+	confirm  *screens.ConfirmPromptMsg
+	showHelp bool
 }
 
 func New(serverURL string) *Model {
@@ -59,7 +62,45 @@ func (m *Model) cycleTheme() {
 	styles.SetTheme(&themes.All[m.themeIdx])
 }
 
+func (m *Model) helpView() string {
+	var sb strings.Builder
+	sb.WriteString(styles.DocTitle.Render("HELP") + "\n\n")
+
+	switch m.screen {
+	case screens.ScreenLogin:
+		sb.WriteString("[Tab] Switch field\n[Enter] Sign In\n[Esc] Quit\n[Ctrl+T] Cycle theme")
+	case screens.ScreenDashboard:
+		sb.WriteString("[d] Browse Scrolls\n[a] Scribe New\n[u] Manage Villagers\n[l] Town Ledger\n[q] Sign Out\n[Ctrl+T] Cycle theme\n[?] Close help")
+	case screens.ScreenDocList:
+		sb.WriteString("[/] Search\n[j/k] Move cursor\n[←/→] Change page\n[enter] Open scroll\n[e] Edit scroll\n[a] New scroll\n[d] Delete scroll\n[q] Back\n[r] Refresh\n[?] Close help")
+	case screens.ScreenDocView:
+		sb.WriteString("[↑/↓] Scroll\n[h/q] Back to list\n[?] Close help")
+	case screens.ScreenDocCreate:
+		sb.WriteString("[Tab] Next field\n[Shift+Tab] Previous field\n[Enter] Continue/Save\n[Backspace] Go back\n[Esc] Cancel\n[?] Close help")
+	case screens.ScreenDocEdit:
+		sb.WriteString("[Tab] Next field\n[Shift+Tab] Previous field\n[Enter] Save changes\n[Backspace] Go back\n[Esc] Cancel\n[?] Close help")
+	case screens.ScreenUsers:
+		sb.WriteString("[j/k] Move cursor\n[a] Register villager\n[d] Dismiss villager\n[r] Refresh\n[q] Back\n[?] Close help")
+	case screens.ScreenAudit:
+		sb.WriteString("[←/→] Page\n[r] Refresh\n[q] Back\n[?] Close help")
+	default:
+		sb.WriteString("[?] Close help")
+	}
+
+	return styles.BorderStyle.Render(sb.String())
+}
+
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.showHelp {
+		if key, ok := msg.(tea.KeyMsg); ok {
+			if key.String() == "?" || key.String() == "esc" || key.String() == "q" {
+				m.showHelp = false
+				return m, nil
+			}
+		}
+		return m, nil
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -80,6 +121,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.String() == "ctrl+t" {
 			m.cycleTheme()
+			return m, nil
+		}
+		if msg.String() == "?" {
+			m.showHelp = true
 			return m, nil
 		}
 
@@ -103,6 +148,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.docViewModel = &dvm
 		m.screen = screens.ScreenDocView
 		m.current = m.docViewModel
+		return m, tea.Batch(m.current.Init(), m.resizeCmd())
+
+	case screens.EditDocMsg:
+		dem := screens.NewDocEditModel(m.apiClient, m.apiClient.User, msg)
+		m.docEditModel = &dem
+		m.screen = screens.ScreenDocEdit
+		m.current = m.docEditModel
 		return m, tea.Batch(m.current.Init(), m.resizeCmd())
 
 	case screens.DocAccessDeniedMsg:
@@ -169,6 +221,11 @@ func (m *Model) handleNavigate(msg screens.NavigateMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) View() string {
+	if m.showHelp {
+		helpBox := m.helpView()
+		return lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Center, helpBox)
+	}
+
 	view := m.current.View()
 
 	if m.confirm != nil {

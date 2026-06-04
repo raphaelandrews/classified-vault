@@ -4,19 +4,21 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/lipgloss"
 
 	"classified-vault/internal/domain"
 	"classified-vault/tui/styles"
 )
 
 type DocumentViewModel struct {
-	doc    *domain.Document
-	user   *domain.User
-	width  int
-	height int
+	doc      *domain.Document
+	user     *domain.User
+	width    int
+	height   int
+	viewport viewport.Model
+	ready    bool
 }
 
 func NewDocumentViewModel(doc *domain.Document, user *domain.User) DocumentViewModel {
@@ -28,30 +30,13 @@ func NewDocumentViewModel(doc *domain.Document, user *domain.User) DocumentViewM
 
 func (m *DocumentViewModel) Init() tea.Cmd { return nil }
 
-func (m *DocumentViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		return m, nil
-	case tea.KeyMsg:
-		switch strings.ToUpper(msg.String()) {
-		case "H", "Q":
-			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDocList} }
-		case "CTRL+C":
-			return m, tea.Quit
-		}
-	}
-	return m, nil
-}
-
-func (m *DocumentViewModel) View() string {
+func (m *DocumentViewModel) buildContent() string {
 	contentWidth := m.width - 12
 	if contentWidth < 40 {
 		contentWidth = 40
 	}
 
-	header := styles.DocViewTitle.Render("*", m.doc.Title)
+	header := styles.DocViewTitle.Render("★ " + m.doc.Title)
 
 	var sb strings.Builder
 	sb.WriteString(header + "\n\n")
@@ -98,9 +83,42 @@ func (m *DocumentViewModel) View() string {
 		}
 	}
 
-	content := styles.BorderStyle.Render(sb.String())
-	main := lipgloss.Place(m.width, m.height-1, lipgloss.Left, lipgloss.Top, content)
-	footer := styles.StatusBarStyle.Width(m.width).Render("[h] Back  [q] Quit")
+	return styles.BorderStyle.Render(sb.String())
+}
 
-	return main + "\n" + footer
+func (m *DocumentViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+
+		if !m.ready {
+			m.viewport = viewport.New(m.width, m.height-1)
+			m.viewport.SetContent(m.buildContent())
+			m.ready = true
+		} else {
+			m.viewport.Width = m.width
+			m.viewport.Height = m.height - 1
+			m.viewport.SetContent(m.buildContent())
+		}
+		return m, nil
+
+	case tea.KeyMsg:
+		switch strings.ToUpper(msg.String()) {
+		case "H", "Q":
+			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDocList} }
+		case "CTRL+C":
+			return m, tea.Quit
+		}
+	}
+
+	m.viewport, cmd = m.viewport.Update(msg)
+	return m, cmd
+}
+
+func (m *DocumentViewModel) View() string {
+	footer := styles.StatusBarStyle.Width(m.width).Render("[↑/↓] Scroll  [h] Back  [q] Quit  [?] Help")
+	return m.viewport.View() + "\n" + footer
 }

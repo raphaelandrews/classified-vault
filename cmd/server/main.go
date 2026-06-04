@@ -91,6 +91,7 @@ func main() {
 
 	mux.HandleFunc("POST /auth/login", authHandler.Login)
 	mux.HandleFunc("POST /auth/logout", authHandler.Logout)
+	mux.HandleFunc("POST /auth/register", authHandler.Register)
 
 	api := middleware.RequireAuth(sessionCache)
 

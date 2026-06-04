@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/paginator"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
@@ -15,7 +17,11 @@ import (
 
 type DocumentListModel struct {
 	docs      []client.CatalogEntry
+	filtered  []client.CatalogEntry
 	cursor    int
+	searching bool
+	search    textinput.Model
+	paginator paginator.Model
 	err       string
 	apiClient *client.APIClient
 	user      *domain.User
@@ -34,10 +40,32 @@ type DocAccessDeniedMsg struct {
 	RequiredCle domain.ClearanceLevel
 }
 
+type EditDocMsg struct {
+	DocID      string
+	Title      string
+	Content    string
+	Department string
+	Classif    domain.ClearanceLevel
+	Tags       []string
+}
+
 func NewDocumentListModel(api *client.APIClient, user *domain.User) DocumentListModel {
+	s := textinput.New()
+	s.Placeholder = "Search scrolls..."
+	s.Width = 40
+	s.Prompt = "/ "
+
+	p := paginator.New()
+	p.Type = paginator.Dots
+	p.PerPage = 10
+	p.ActiveDot = lipgloss.NewStyle().Foreground(styles.Primary).Render("●")
+	p.InactiveDot = lipgloss.NewStyle().Foreground(styles.Dimmed).Render("○")
+
 	return DocumentListModel{
 		apiClient: api,
 		user:      user,
+		search:    s,
+		paginator: p,
 	}
 }
 
@@ -81,7 +109,53 @@ func containsArcane(tags []string) bool {
 	return false
 }
 
+func (m *DocumentListModel) applyFilter() {
+	if m.search.Value() == "" {
+		m.filtered = m.docs
+	} else {
+		query := strings.ToLower(m.search.Value())
+		var filtered []client.CatalogEntry
+		for _, doc := range m.docs {
+			if strings.Contains(strings.ToLower(doc.Title), query) ||
+				strings.Contains(strings.ToLower(doc.Department), query) ||
+				strings.Contains(strings.ToLower(doc.Folder), query) {
+				filtered = append(filtered, doc)
+			}
+		}
+		m.filtered = filtered
+	}
+	m.paginator.SetTotalPages(len(m.filtered))
+	if m.cursor >= len(m.filtered) {
+		m.cursor = max(0, len(m.filtered)-1)
+	}
+}
+
 func (m *DocumentListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
+	if m.searching {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "esc":
+				m.searching = false
+				m.search.SetValue("")
+				m.search.Blur()
+				m.applyFilter()
+				return m, nil
+			case "enter":
+				m.searching = false
+				m.search.Blur()
+				m.applyFilter()
+				return m, nil
+			}
+		}
+		var cmd tea.Cmd
+		m.search, cmd = m.search.Update(msg)
+		m.applyFilter()
+		return m, cmd
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -90,6 +164,7 @@ func (m *DocumentListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case []client.CatalogEntry:
 		m.docs = msg
+		m.applyFilter()
 		m.err = ""
 		return m, nil
 
@@ -99,55 +174,100 @@ func (m *DocumentListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch strings.ToUpper(msg.String()) {
+		case "/":
+			m.searching = true
+			m.search.SetValue("")
+			m.search.Focus()
+			return m, nil
 		case "UP", "K":
 			if m.cursor > 0 {
 				m.cursor--
 			} else {
-				m.cursor = len(m.docs) - 1
+				m.cursor = max(0, len(m.filtered)-1)
 			}
 		case "DOWN", "J":
-			if m.cursor < len(m.docs)-1 {
+			if m.cursor < len(m.filtered)-1 {
 				m.cursor++
 			} else {
 				m.cursor = 0
 			}
-		case "ENTER", "L":
-			if len(m.docs) > 0 && m.cursor < len(m.docs) {
-				entry := m.docs[m.cursor]
-				docTier := domain.ClearanceLevel(entry.Classification)
-				if m.canAccess(entry) {
-					return m, func() tea.Msg { return DocSelectedMsg{DocID: entry.ID} }
+		case "LEFT", "H":
+			m.paginator.PrevPage()
+			m.cursor = 0
+		case "RIGHT", "L":
+			m.paginator.NextPage()
+			m.cursor = 0
+		case "ENTER":
+			if len(m.filtered) > 0 && m.cursor < len(m.filtered) {
+				idx := m.paginator.Page*m.paginator.PerPage + m.cursor
+				if idx < len(m.filtered) {
+					entry := m.filtered[idx]
+					docTier := domain.ClearanceLevel(entry.Classification)
+					if m.canAccess(entry) {
+						return m, func() tea.Msg { return DocSelectedMsg{DocID: entry.ID} }
+					}
+					return m, func() tea.Msg {
+						return DocAccessDeniedMsg{
+							Title:       entry.Title,
+							Department:  entry.Department,
+							UserCle:     m.user.Clearance,
+							RequiredCle: docTier,
+						}
+					}
 				}
-				return m, func() tea.Msg {
-					return DocAccessDeniedMsg{
-						Title:       entry.Title,
-						Department:  entry.Department,
-						UserCle:     m.user.Clearance,
-						RequiredCle: docTier,
+			}
+		case "E":
+			if len(m.filtered) > 0 && m.cursor < len(m.filtered) {
+				idx := m.paginator.Page*m.paginator.PerPage + m.cursor
+				if idx < len(m.filtered) {
+					entry := m.filtered[idx]
+					if !m.canAccess(entry) {
+						return m, nil
+					}
+					return m, func() tea.Msg {
+						doc, err := m.apiClient.GetDocument(entry.ID)
+						if err != nil {
+							return err
+						}
+						tags := doc.Tags
+						if tags == nil {
+							tags = []string{}
+						}
+						return EditDocMsg{
+							DocID:      doc.ID,
+							Title:      doc.Title,
+							Content:    doc.Content,
+							Department: string(doc.Department),
+							Classif:    doc.Classification,
+							Tags:       tags,
+						}
 					}
 				}
 			}
 		case "A":
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDocCreate} }
 		case "D":
-			if m.cursor < len(m.docs) {
-				entry := m.docs[m.cursor]
-				id := entry.ID
-				title := entry.Title
-				return m, func() tea.Msg {
-					return ConfirmPromptMsg{
-						Message: fmt.Sprintf("Destroy scroll \"%s\"?\nThis action cannot be undone.", title),
-						OnYes: func() tea.Msg {
-							err := m.apiClient.DeleteDocument(id)
-							if err != nil {
-								return err
-							}
-							return NavigateMsg{Screen: ScreenDocList}
-						},
+			if len(m.filtered) > 0 && m.cursor < len(m.filtered) {
+				idx := m.paginator.Page*m.paginator.PerPage + m.cursor
+				if idx < len(m.filtered) {
+					entry := m.filtered[idx]
+					id := entry.ID
+					title := entry.Title
+					return m, func() tea.Msg {
+						return ConfirmPromptMsg{
+							Message: fmt.Sprintf("Destroy scroll \"%s\"?\nThis action cannot be undone.", title),
+							OnYes: func() tea.Msg {
+								err := m.apiClient.DeleteDocument(id)
+								if err != nil {
+									return err
+								}
+								return NavigateMsg{Screen: ScreenDocList}
+							},
+						}
 					}
 				}
 			}
-		case "H", "Q":
+		case "Q":
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDashboard} }
 		case "CTRL+C":
 			return m, tea.Quit
@@ -156,7 +276,7 @@ func (m *DocumentListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	return m, nil
+	return m, tea.Batch(cmds...)
 }
 
 func (m *DocumentListModel) View() string {
@@ -166,15 +286,26 @@ func (m *DocumentListModel) View() string {
 		Bold(true).
 		Foreground(styles.Primary).
 		Render(fmt.Sprintf("SCROLLS — %s  %s", styles.ClearanceBadge(m.user.Clearance.String()), styles.DepartmentBadge(string(m.user.Department))))
-	sb.WriteString(header + "\n\n")
+	sb.WriteString(header + "\n")
+
+	if m.searching {
+		sb.WriteString("\n" + m.search.View() + "\n")
+	} else if m.search.Value() != "" {
+		sb.WriteString(styles.DocMeta.Render(fmt.Sprintf("\nFilter: \"%s\"  [/] Change  [esc] Clear", m.search.Value())) + "\n")
+	}
+	sb.WriteString("\n")
 
 	if m.err != "" {
 		sb.WriteString(styles.ErrorStyle.Render(m.err) + "\n\n")
 	}
 
-	if len(m.docs) == 0 {
+	if len(m.filtered) == 0 {
 		sb.WriteString(styles.DocMeta.Render("  No scrolls found.\n"))
 	} else {
+		start := m.paginator.Page * m.paginator.PerPage
+		end := min(start+m.paginator.PerPage, len(m.filtered))
+		page := m.filtered[start:end]
+
 		t := table.New().
 			Border(lipgloss.NormalBorder()).
 			BorderStyle(lipgloss.NewStyle().Foreground(styles.BorderCol)).
@@ -184,7 +315,7 @@ func (m *DocumentListModel) View() string {
 				switch {
 				case row == table.HeaderRow:
 					return base.Foreground(styles.Foreground).Bold(true)
-				case row == m.cursor:
+				case row-1 == m.cursor:
 					return base.Foreground(styles.DarkText).Background(styles.Selected).Bold(true)
 				case row%2 == 0:
 					return base.Foreground(styles.Foreground).Background(styles.RowEven)
@@ -194,8 +325,8 @@ func (m *DocumentListModel) View() string {
 			}).
 			Headers("", "TITLE", "TIER", "DEPT", "FOLDER", "DATE")
 
-		for i, entry := range m.docs {
-			marker := fmt.Sprintf("%d", i+1)
+		for i, entry := range page {
+			marker := fmt.Sprintf("%d", start+i+1)
 			title := entry.Title
 			tier := styles.ClearanceBadge(domain.ClearanceLevel(entry.Classification).String())
 			department := styles.DepartmentBadge(entry.Department)
@@ -218,10 +349,14 @@ func (m *DocumentListModel) View() string {
 		}
 
 		sb.WriteString(t.Render())
+
+		if m.paginator.TotalPages > 1 {
+			sb.WriteString("\n" + m.paginator.View())
+		}
 	}
 
 	content := styles.BorderStyle.Render(sb.String())
-	footer := styles.StatusBarStyle.Width(m.width).Render("[j/k] Move  [l] Open  [a] New  [d] Destroy  [h] Back  [r] Refresh")
+	footer := styles.StatusBarStyle.Width(m.width).Render("[/] Search  [j/k] Move  [←/→] Page  [enter] Open  [e] Edit  [a] New  [d] Destroy  [q] Back  [r] Refresh")
 
 	return lipgloss.JoinVertical(lipgloss.Left, content, footer)
 }

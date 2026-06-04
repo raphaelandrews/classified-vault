@@ -14,6 +14,7 @@ type AuthService interface {
 	Login(username, password, ip string) (auth.Session, string, *domain.User, error)
 	Logout(token string) error
 	GetSession(token string) (*auth.Session, error)
+	Register(username, password string, department domain.Department) (*domain.User, error)
 }
 
 type AuthHandler struct {
@@ -84,12 +85,37 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, domain.User{
-		ID:        session.UserID,
-		Username:  session.Username,
-		Role:      session.Role,
-		Clearance: session.Clearance,
-		Department:   session.Department,
+		ID:         session.UserID,
+		Username:   session.Username,
+		Role:       session.Role,
+		Clearance:  session.Clearance,
+		Department: session.Department,
 	})
+}
+
+func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username   string `json:"username"`
+		Password   string `json:"password"`
+		Department string `json:"department"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	if req.Username == "" || req.Password == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "username and password required"})
+		return
+	}
+
+	user, err := h.service.Register(req.Username, req.Password, domain.Department(req.Department))
+	if err != nil {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, user)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

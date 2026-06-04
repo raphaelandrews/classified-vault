@@ -40,17 +40,51 @@ func (s *AuthService) Login(username, password, ip string) (auth.Session, string
 
 	token := auth.NewToken()
 	session := auth.Session{
-		UserID:    user.ID,
-		Username:  user.Username,
-		Role:      user.Role,
-		Clearance: user.Clearance,
-		Department:   user.Department,
-		ExpiresAt: time.Now().Add(s.cfg.SessionTTL),
+		UserID:     user.ID,
+		Username:   user.Username,
+		Role:       user.Role,
+		Clearance:  user.Clearance,
+		Department: user.Department,
+		ExpiresAt:  time.Now().Add(s.cfg.SessionTTL),
 	}
 
 	s.sessionCache.Set(token, session)
 
 	return session, token, user, nil
+}
+
+func (s *AuthService) Register(username, password string, department domain.Department) (*domain.User, error) {
+	existing, err := s.userRepo.FindByUsername(username)
+	if err != nil {
+		return nil, fmt.Errorf("check username: %w", err)
+	}
+	if existing != nil {
+		return nil, fmt.Errorf("username already taken")
+	}
+
+	user := &domain.User{
+		Username:     username,
+		PasswordHash: password,
+		Role:         domain.RoleAssociate,
+		Department:   department,
+	}
+
+	userID := auth.NewToken()[:12]
+	user.ID = "usr_" + userID
+
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		return nil, fmt.Errorf("hash password: %w", err)
+	}
+	user.PasswordHash = hash
+	user.Active = true
+	user.Clearance = domain.MaxClearanceForRole(user.Role)
+
+	if err := s.userRepo.Create(user); err != nil {
+		return nil, fmt.Errorf("create user: %w", err)
+	}
+
+	return user, nil
 }
 
 func (s *AuthService) Logout(token string) error {

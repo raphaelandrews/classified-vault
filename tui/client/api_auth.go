@@ -60,3 +60,30 @@ func (c *APIClient) GetMe() (*domain.User, error) {
 	}
 	return &user, nil
 }
+
+func (c *APIClient) Register(username, password, department string) (*domain.User, error) {
+	resp, body, err := c.do("POST", "/auth/register", map[string]string{
+		"username":   username,
+		"password":   password,
+		"department": department,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusCreated {
+		var apiErr map[string]string
+		json.Unmarshal(body, &apiErr)
+		msg := apiErr["error"]
+		if msg == "" {
+			msg = fmt.Sprintf("register failed (status %d)", resp.StatusCode)
+		}
+		return nil, fmt.Errorf("%s", msg)
+	}
+
+	var user domain.User
+	if err := json.Unmarshal(body, &user); err != nil {
+		return nil, fmt.Errorf("unmarshal user: %w", err)
+	}
+	return &user, nil
+}

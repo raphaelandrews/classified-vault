@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/paginator"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
@@ -16,14 +17,22 @@ import (
 type AuditLogModel struct {
 	apiClient *client.APIClient
 	logs      []*domain.AuditLog
+	paginator paginator.Model
 	err       string
 	width     int
 	height    int
 }
 
 func NewAuditLogModel(api *client.APIClient) AuditLogModel {
+	p := paginator.New()
+	p.Type = paginator.Dots
+	p.PerPage = 15
+	p.ActiveDot = lipgloss.NewStyle().Foreground(styles.Primary).Render("●")
+	p.InactiveDot = lipgloss.NewStyle().Foreground(styles.Dimmed).Render("○")
+
 	return AuditLogModel{
 		apiClient: api,
+		paginator: p,
 	}
 }
 
@@ -47,6 +56,7 @@ func (m *AuditLogModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case []*domain.AuditLog:
 		m.logs = msg
+		m.paginator.SetTotalPages(len(m.logs))
 		m.err = ""
 		return m, nil
 	case error:
@@ -54,9 +64,13 @@ func (m *AuditLogModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyMsg:
 		switch strings.ToUpper(msg.String()) {
+		case "LEFT", "H":
+			m.paginator.PrevPage()
+		case "RIGHT", "L":
+			m.paginator.NextPage()
 		case "R":
 			return m, m.loadLogs
-		case "H", "Q":
+		case "Q":
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDashboard} }
 		case "CTRL+C":
 			return m, tea.Quit
@@ -76,6 +90,10 @@ func (m *AuditLogModel) View() string {
 	if len(m.logs) == 0 {
 		sb.WriteString(styles.DocMeta.Render("  No ledger entries.\n"))
 	} else {
+		start := m.paginator.Page * m.paginator.PerPage
+		end := min(start+m.paginator.PerPage, len(m.logs))
+		page := m.logs[start:end]
+
 		t := table.New().
 			Border(lipgloss.NormalBorder()).
 			BorderStyle(lipgloss.NewStyle().Foreground(styles.BorderCol)).
@@ -92,7 +110,7 @@ func (m *AuditLogModel) View() string {
 			}).
 			Headers("", "TIME", "ACTION", "USER", "RESOURCE")
 
-		for _, entry := range m.logs {
+		for _, entry := range page {
 			status := "★"
 			if !entry.Success {
 				status = "✗"
@@ -106,10 +124,14 @@ func (m *AuditLogModel) View() string {
 		}
 
 		sb.WriteString(t.Render())
+
+		if m.paginator.TotalPages > 1 {
+			sb.WriteString("\n" + m.paginator.View())
+		}
 	}
 
 	content := styles.BorderStyle.Render(sb.String())
-	footer := styles.StatusBarStyle.Width(m.width).Render("[r] Refresh  [h] Back")
+	footer := styles.StatusBarStyle.Width(m.width).Render("[←/→] Page  [r] Refresh  [q] Back")
 
 	return lipgloss.JoinVertical(lipgloss.Left, content, footer)
 }

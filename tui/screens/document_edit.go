@@ -15,9 +15,10 @@ import (
 	"classified-vault/tui/styles"
 )
 
-type DocCreateModel struct {
+type DocEditModel struct {
 	apiClient *client.APIClient
 	user      *domain.User
+	docID     string
 	width     int
 	height    int
 
@@ -36,25 +37,22 @@ type DocCreateModel struct {
 	loading  bool
 }
 
-const tierCount = 6
-
-func NewDocCreateModel(api *client.APIClient, user *domain.User) DocCreateModel {
+func NewDocEditModel(api *client.APIClient, user *domain.User, msg EditDocMsg) DocEditModel {
 	ti := textinput.New()
-	ti.Placeholder = "Scroll Title"
+	ti.SetValue(msg.Title)
 	ti.CharLimit = 80
 	ti.Width = 50
 	ti.Prompt = ""
-	ti.Focus()
 
 	ca := textarea.New()
-	ca.Placeholder = "Write scroll content..."
+	ca.SetValue(msg.Content)
 	ca.CharLimit = 5000
 	ca.SetWidth(60)
 	ca.SetHeight(10)
 	ca.ShowLineNumbers = false
 
 	ta := textinput.New()
-	ta.Placeholder = "arcane, ritual, barn-find"
+	ta.SetValue(strings.Join(msg.Tags, ", "))
 	ta.CharLimit = 200
 	ta.Width = 50
 	ta.Prompt = ""
@@ -63,11 +61,12 @@ func NewDocCreateModel(api *client.APIClient, user *domain.User) DocCreateModel 
 	sp.Spinner = spinner.Dot
 	sp.Style = lipgloss.NewStyle().Foreground(styles.Accent)
 
-	return DocCreateModel{
+	return DocEditModel{
 		apiClient:      api,
 		user:           user,
-		classification: 0,
-		department:     string(user.Department),
+		docID:          msg.DocID,
+		classification: int(msg.Classif),
+		department:     msg.Department,
 		titleInput:     ti,
 		contentInput:   ca,
 		tagsInput:      ta,
@@ -75,14 +74,11 @@ func NewDocCreateModel(api *client.APIClient, user *domain.User) DocCreateModel 
 	}
 }
 
-func (m *DocCreateModel) Init() tea.Cmd {
-	var cmds []tea.Cmd
-	cmds = append(cmds, textinput.Blink)
-	cmds = append(cmds, m.spinner.Tick)
-	return tea.Batch(cmds...)
+func (m *DocEditModel) Init() tea.Cmd {
+	return tea.Batch(textinput.Blink, m.spinner.Tick)
 }
 
-func (m *DocCreateModel) createDoc() tea.Msg {
+func (m *DocEditModel) updateDoc() tea.Msg {
 	var tags []string
 	if strings.TrimSpace(m.tagsInput.Value()) != "" {
 		for _, t := range strings.Split(m.tagsInput.Value(), ",") {
@@ -93,7 +89,8 @@ func (m *DocCreateModel) createDoc() tea.Msg {
 		tags = []string{}
 	}
 
-	doc, err := m.apiClient.CreateDocument(
+	doc, err := m.apiClient.UpdateDocument(
+		m.docID,
 		m.titleInput.Value(),
 		m.contentInput.Value(),
 		domain.ClearanceLevel(m.classification),
@@ -106,7 +103,7 @@ func (m *DocCreateModel) createDoc() tea.Msg {
 	return doc
 }
 
-func (m *DocCreateModel) focusField(idx int) {
+func (m *DocEditModel) focusField(idx int) {
 	m.focusIdx = idx
 	m.titleInput.Blur()
 	m.contentInput.Blur()
@@ -121,7 +118,7 @@ func (m *DocCreateModel) focusField(idx int) {
 	}
 }
 
-func (m *DocCreateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *DocEditModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.done {
 		if key, ok := msg.(tea.KeyMsg); ok {
 			switch strings.ToUpper(key.String()) {
@@ -147,7 +144,7 @@ func (m *DocCreateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case *domain.Document:
 		m.done = true
-		m.result = styles.SuccessStyle.Render(fmt.Sprintf("Scroll scribed: %s", msg.Title))
+		m.result = styles.SuccessStyle.Render(fmt.Sprintf("Scroll updated: %s", msg.Title))
 		return m, nil
 
 	case error:
@@ -164,7 +161,7 @@ func (m *DocCreateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "esc":
-			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDashboard} }
+			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDocList} }
 		case "tab":
 			m.focusField((m.focusIdx + 1) % 4)
 			return m, nil
@@ -194,7 +191,7 @@ func (m *DocCreateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.loading = true
 				m.err = ""
-				return m, m.createDoc
+				return m, m.updateDoc
 			} else if m.focusIdx == 3 {
 				if m.titleInput.Value() == "" {
 					m.err = "Title is required"
@@ -206,7 +203,7 @@ func (m *DocCreateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.loading = true
 				m.err = ""
-				return m, m.createDoc
+				return m, m.updateDoc
 			}
 		case "backspace":
 			if m.focusIdx == 3 {
@@ -236,10 +233,10 @@ func (m *DocCreateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *DocCreateModel) View() string {
+func (m *DocEditModel) View() string {
 	if m.done {
 		var sb strings.Builder
-		sb.WriteString(styles.DocTitle.Render("★ Scroll Scribed") + "\n\n")
+		sb.WriteString(styles.DocTitle.Render("★ Scroll Updated") + "\n\n")
 		sb.WriteString(m.result + "\n\n")
 		sb.WriteString(styles.DocMeta.Render("[Q] Back to Scrolls"))
 		return lipgloss.Place(
@@ -250,7 +247,7 @@ func (m *DocCreateModel) View() string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(styles.DocTitle.Render("★ Scribe New Scroll") + "\n\n")
+	sb.WriteString(styles.DocTitle.Render("★ Edit Scroll") + "\n\n")
 
 	titleLabel := styles.DocPrompt.Render("Title")
 	if m.focusIdx == 0 {
@@ -290,10 +287,10 @@ func (m *DocCreateModel) View() string {
 	}
 
 	if m.loading {
-		sb.WriteString("\n" + m.spinner.View() + " Scribing scroll...")
+		sb.WriteString("\n" + m.spinner.View() + " Updating scroll...")
 	}
 
-	sb.WriteString(styles.DocMeta.Render("\n\n[Tab] Next  [↑/↓] Select tier  [Enter] Continue  [Esc] Cancel"))
+	sb.WriteString(styles.DocMeta.Render("\n\n[Tab] Next  [↑/↓] Select tier  [Enter] Save  [Esc] Cancel"))
 
 	return lipgloss.Place(
 		m.width, m.height,

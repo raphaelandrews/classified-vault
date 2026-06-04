@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
@@ -21,15 +22,13 @@ type UsersModel struct {
 	width     int
 	height    int
 
-	adding   bool
-	addUser  string
-	addEmail string
-	addPass  string
-	addRole  int
-	addDept  int
-	addStep  int
-	addDone  string
-	numBuf   string
+	adding        bool
+	addUserInput  textinput.Model
+	addEmailInput textinput.Model
+	addPassInput  textinput.Model
+	addRoleSel    int
+	addDeptSel    int
+	addFocus      int
 }
 
 var addRoles = []domain.Role{domain.RoleAssociate, domain.RoleVillager, domain.RoleKeeper, domain.RoleMayor}
@@ -48,10 +47,33 @@ var addDepts = []domain.Department{
 }
 
 func NewUsersModel(api *client.APIClient) UsersModel {
+	ui := textinput.New()
+	ui.Placeholder = "Username"
+	ui.CharLimit = 32
+	ui.Width = 30
+	ui.Prompt = ""
+
+	ei := textinput.New()
+	ei.Placeholder = "villager@pelican.town"
+	ei.CharLimit = 64
+	ei.Width = 30
+	ei.Prompt = ""
+
+	pi := textinput.New()
+	pi.Placeholder = "Password"
+	pi.EchoMode = textinput.EchoPassword
+	pi.EchoCharacter = '•'
+	pi.CharLimit = 64
+	pi.Width = 30
+	pi.Prompt = ""
+
 	return UsersModel{
-		apiClient: api,
-		addRole:   1,
-		addDept:   0,
+		apiClient:     api,
+		addUserInput:  ui,
+		addEmailInput: ei,
+		addPassInput:  pi,
+		addRoleSel:    1,
+		addDeptSel:    0,
 	}
 }
 
@@ -91,9 +113,9 @@ func (m *UsersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.err != "" && strings.Contains(m.err, "villager registered:") {
 			m.err = ""
 			m.adding = false
-			m.addUser = ""
-			m.addEmail = ""
-			m.addPass = ""
+			m.addUserInput.Reset()
+			m.addEmailInput.Reset()
+			m.addPassInput.Reset()
 			m.cursor = 0
 			return m, m.loadUsers
 		}
@@ -113,12 +135,13 @@ func (m *UsersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "A":
 			m.adding = true
-			m.addStep = 0
-			m.addUser = ""
-			m.addEmail = ""
-			m.addPass = ""
-			m.addRole = 1
-			m.addDept = 0
+			m.addFocus = 0
+			m.addUserInput.Reset()
+			m.addEmailInput.Reset()
+			m.addPassInput.Reset()
+			m.addRoleSel = 1
+			m.addDeptSel = 0
+			m.addUserInput.Focus()
 			return m, nil
 		case "D":
 			if m.cursor < len(m.users) {
@@ -153,10 +176,6 @@ func (m *UsersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *UsersModel) View() string {
 	var sb strings.Builder
-
-	if m.addDone != "" {
-		sb.WriteString(styles.SuccessStyle.Render(m.addDone) + "\n\n")
-	}
 
 	if m.adding {
 		return m.viewAddForm()

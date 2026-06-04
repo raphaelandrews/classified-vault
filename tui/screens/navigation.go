@@ -10,6 +10,7 @@ const (
 	ScreenDocList
 	ScreenDocView
 	ScreenDocCreate
+	ScreenDocEdit
 	ScreenAccessDenied
 	ScreenUsers
 	ScreenAudit
