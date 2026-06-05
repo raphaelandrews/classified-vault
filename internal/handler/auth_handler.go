@@ -88,6 +88,7 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		ID:         session.UserID,
 		Username:   session.Username,
 		Role:       session.Role,
+		RoleName:   session.RoleName,
 		Clearance:  session.Clearance,
 		Department: session.Department,
 	})

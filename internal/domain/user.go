@@ -8,8 +8,9 @@ type User struct {
 	PasswordHash string         `json:"-"`
 	Email        string         `json:"email"`
 	Role         Role           `json:"role"`
+	RoleName     string         `json:"role_name,omitempty"`
 	Clearance    ClearanceLevel `json:"tier"`
-	Department      Department        `json:"department"`
+	Department   Department     `json:"department"`
 	Active       bool           `json:"active"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`

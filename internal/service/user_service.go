@@ -46,6 +46,11 @@ func (s *UserService) Create(user *domain.User) (*domain.User, error) {
 	if password == "" {
 		password = uuid.New().String()[:12]
 	}
+
+	if err := s.validateUniqueRole(user.Role, user.Department, ""); err != nil {
+		return nil, err
+	}
+
 	hash, err := auth.HashPassword(password)
 	if err != nil {
 		return nil, fmt.Errorf("hash password: %w", err)
@@ -53,6 +58,9 @@ func (s *UserService) Create(user *domain.User) (*domain.User, error) {
 	user.PasswordHash = hash
 	user.Active = true
 	user.Clearance = domain.MaxClearanceForRole(user.Role)
+	if user.RoleName == "" {
+		user.RoleName = string(user.Role)
+	}
 
 	if err := s.userRepo.Create(user); err != nil {
 		return nil, err
@@ -68,6 +76,28 @@ func (s *UserService) Create(user *domain.User) (*domain.User, error) {
 	})
 
 	return user, nil
+}
+
+func (s *UserService) validateUniqueRole(role domain.Role, dept domain.Department, excludeID string) error {
+	switch role {
+	case domain.RoleMayor:
+		exists, err := s.userRepo.ExistsByRole(role, excludeID)
+		if err != nil {
+			return fmt.Errorf("check mayor uniqueness: %w", err)
+		}
+		if exists {
+			return fmt.Errorf("only one Mayor may exist in Pelican Town")
+		}
+	case domain.RoleKeeper:
+		exists, err := s.userRepo.ExistsByDepartmentAndRole(dept, role, excludeID)
+		if err != nil {
+			return fmt.Errorf("check director uniqueness: %w", err)
+		}
+		if exists {
+			return fmt.Errorf("department %s already has a Director", dept)
+		}
+	}
+	return nil
 }
 
 func (s *UserService) Update(id string, user *domain.User) (*domain.User, error) {
@@ -89,8 +119,11 @@ func (s *UserService) Update(id string, user *domain.User) (*domain.User, error)
 		user.PasswordHash = existing.PasswordHash
 	}
 
-	if user.Role != existing.Role {
+	if user.Role != existing.Role || user.Department != existing.Department {
 		user.Clearance = domain.MaxClearanceForRole(user.Role)
+		if err := s.validateUniqueRole(user.Role, user.Department, id); err != nil {
+			return nil, err
+		}
 	} else {
 		user.Clearance = existing.Clearance
 	}
@@ -147,7 +180,8 @@ func (s *UserService) SeedMayor(defaultPassword string) error {
 			Username:     "lewis",
 			Email:        "lewis@pelican.valley",
 			Role:         domain.RoleMayor,
-			Department:      domain.DepartmentMayorsOffice,
+			RoleName:     string(domain.RoleMayor),
+			Department:   domain.DepartmentMayorsOffice,
 			PasswordHash: defaultPassword,
 		}
 		if _, err := s.Create(mayor); err != nil {

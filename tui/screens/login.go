@@ -100,19 +100,7 @@ func (m *LoginModel) doLogin() tea.Msg {
 	return LoginMsg{User: &resp.User, Token: resp.Token}
 }
 
-var registerDepts = []domain.Department{
-	domain.DepartmentMayorsOffice,
-	domain.DepartmentWizardsTower,
-	domain.DepartmentJojaCorp,
-	domain.DepartmentAdventurersGuild,
-	domain.DepartmentHarveysClinic,
-	domain.DepartmentCommunityCenter,
-	domain.DepartmentCarpentersShop,
-	domain.DepartmentMuseum,
-	domain.DepartmentBulletinBoard,
-	domain.DepartmentQisOffice,
-	domain.DepartmentPierDocks,
-}
+var registerDepts = domain.AllDepartments
 
 func (m *LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {

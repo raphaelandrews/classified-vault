@@ -67,8 +67,8 @@ func (m *DashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *DashboardModel) View() string {
-	header := fmt.Sprintf("★ PELICAN TOWN ARCHIVES    Villager: %s  %s  %s",
-		styles.SuccessStyle.Render(m.user.Username),
+	header := fmt.Sprintf("★ PELICAN TOWN ARCHIVES    %s  %s  %s",
+		styles.SuccessStyle.Render(m.user.RoleName+" "+m.user.Username),
 		styles.DepartmentBadge(string(m.user.Department)),
 		styles.ClearanceBadge(m.user.Clearance.String()),
 	)
@@ -90,7 +90,7 @@ func (m *DashboardModel) View() string {
 		) + "\n\n")
 	} else if m.user.Role == domain.RoleKeeper {
 		sb.WriteString(styles.BorderStyle.Render(
-			styles.DocTitle.Render("★ RECORD KEEPER")+"\n"+
+			styles.DocTitle.Render("★ DIRECTOR")+"\n"+
 				styles.DocPrompt.Render("[A]")+" Scribe New Scrolls",
 		) + "\n\n")
 	}

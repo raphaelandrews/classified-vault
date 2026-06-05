@@ -43,6 +43,7 @@ func (s *AuthService) Login(username, password, ip string) (auth.Session, string
 		UserID:     user.ID,
 		Username:   user.Username,
 		Role:       user.Role,
+		RoleName:   user.RoleName,
 		Clearance:  user.Clearance,
 		Department: user.Department,
 		ExpiresAt:  time.Now().Add(s.cfg.SessionTTL),
@@ -66,6 +67,7 @@ func (s *AuthService) Register(username, password string, department domain.Depa
 		Username:     username,
 		PasswordHash: password,
 		Role:         domain.RoleAssociate,
+		RoleName:     string(domain.RoleAssociate),
 		Department:   department,
 	}
 

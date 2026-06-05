@@ -110,16 +110,16 @@ func init() {
 
 func ClearanceBadge(level string) string {
 	switch level {
-	case "PUBLIC NOTICE":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#928374")).Render("[ PUBLIC NOTICE  ]")
-	case "COUNCIL EYES ONLY":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#a9b665")).Render("[ COUNCIL EYES   ]")
-	case "GUILD BUSINESS":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#d8a657")).Render("[ GUILD BUSINESS ]")
-	case "CORPORATE ACCESS":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#e78a4e")).Render("[ CORPORATE ACC  ]")
-	case "ARCANE KNOWLEDGE":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#d3869b")).Render("[ ARCANE KNOWLEDGE ]")
+	case "TOWN NOTICE":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#928374")).Render("[ TOWN NOTICE    ]")
+	case "GUILD SEALED":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#a9b665")).Render("[ GUILD SEALED   ]")
+	case "COUNCIL SEALED":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#d8a657")).Render("[ COUNCIL SEALED ]")
+	case "VAULT SEALED":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#e78a4e")).Render("[ VAULT SEALED   ]")
+	case "ARCANE SEALED":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#d3869b")).Render("[ ARCANE SEALED  ]")
 	case "JUNIMO SCRIPT":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("#ea6962")).Render("[ JUNIMO SCRIPT  ]")
 	default:
@@ -148,9 +148,11 @@ func DepartmentBadge(department string) string {
 	case "Bulletin Board":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("#bdae93")).Render("[ Bulletin Board ]")
 	case "Mr. Qi's Office":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#83a598")).Render("[ Mr. Qi's Off. ]")
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#83a598")).Render("[ Mr. Qi's Off.  ]")
 	case "Pier & Docks":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#7daea3")).Render("[ Pier & Docks  ]")
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#7daea3")).Render("[ Pier & Docks   ]")
+	case "Roving Trader":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#d8a657")).Render("[ Roving Trader  ]")
 	default:
 		return lipgloss.NewStyle().Foreground(Dimmed).Render("[ " + department + " ]")
 	}

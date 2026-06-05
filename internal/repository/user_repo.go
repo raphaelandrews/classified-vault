@@ -18,10 +18,11 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 func (r *UserRepository) FindByUsername(username string) (*domain.User, error) {
 	var u domain.User
 	var department string
+	var roleName sql.NullString
 	err := r.db.QueryRow(
-		`SELECT id, username, password_hash, email, role, clearance, department, active, created_at, updated_at
+		`SELECT id, username, password_hash, email, role, clearance, department, role_name, active, created_at, updated_at
 		 FROM users WHERE username = ?`, username,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.Role, &u.Clearance, &department, &u.Active, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.Role, &u.Clearance, &department, &roleName, &u.Active, &u.CreatedAt, &u.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -29,16 +30,18 @@ func (r *UserRepository) FindByUsername(username string) (*domain.User, error) {
 		return nil, err
 	}
 	u.Department = domain.Department(department)
+	u.RoleName = roleName.String
 	return &u, nil
 }
 
 func (r *UserRepository) FindByID(id string) (*domain.User, error) {
 	var u domain.User
 	var department string
+	var roleName sql.NullString
 	err := r.db.QueryRow(
-		`SELECT id, username, password_hash, email, role, clearance, department, active, created_at, updated_at
+		`SELECT id, username, password_hash, email, role, clearance, department, role_name, active, created_at, updated_at
 		 FROM users WHERE id = ?`, id,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.Role, &u.Clearance, &department, &u.Active, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.Role, &u.Clearance, &department, &roleName, &u.Active, &u.CreatedAt, &u.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -46,12 +49,13 @@ func (r *UserRepository) FindByID(id string) (*domain.User, error) {
 		return nil, err
 	}
 	u.Department = domain.Department(department)
+	u.RoleName = roleName.String
 	return &u, nil
 }
 
 func (r *UserRepository) FindAll() ([]*domain.User, error) {
 	rows, err := r.db.Query(
-		`SELECT id, username, password_hash, email, role, clearance, department, active, created_at, updated_at
+		`SELECT id, username, password_hash, email, role, clearance, department, role_name, active, created_at, updated_at
 		 FROM users ORDER BY created_at DESC`,
 	)
 	if err != nil {
@@ -63,10 +67,12 @@ func (r *UserRepository) FindAll() ([]*domain.User, error) {
 	for rows.Next() {
 		var u domain.User
 		var department string
-		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.Role, &u.Clearance, &department, &u.Active, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		var roleName sql.NullString
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.Role, &u.Clearance, &department, &roleName, &u.Active, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
 		}
 		u.Department = domain.Department(department)
+		u.RoleName = roleName.String
 		users = append(users, &u)
 	}
 	return users, rows.Err()
@@ -80,9 +86,9 @@ func (r *UserRepository) Create(u *domain.User) error {
 		u.Department = domain.DepartmentMuseum
 	}
 	_, err := r.db.Exec(
-		`INSERT INTO users (id, username, password_hash, email, role, clearance, department, active, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		u.ID, u.Username, u.PasswordHash, u.Email, u.Role, u.Clearance, string(u.Department), u.Active, u.CreatedAt, u.UpdatedAt,
+		`INSERT INTO users (id, username, password_hash, email, role, clearance, department, role_name, active, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.ID, u.Username, u.PasswordHash, u.Email, u.Role, u.Clearance, string(u.Department), u.RoleName, u.Active, u.CreatedAt, u.UpdatedAt,
 	)
 	return err
 }
@@ -90,9 +96,9 @@ func (r *UserRepository) Create(u *domain.User) error {
 func (r *UserRepository) Update(u *domain.User) error {
 	u.UpdatedAt = time.Now()
 	_, err := r.db.Exec(
-		`UPDATE users SET username=?, password_hash=?, email=?, role=?, clearance=?, department=?, active=?, updated_at=?
+		`UPDATE users SET username=?, password_hash=?, email=?, role=?, clearance=?, department=?, role_name=?, active=?, updated_at=?
 		 WHERE id=?`,
-		u.Username, u.PasswordHash, u.Email, u.Role, u.Clearance, string(u.Department), u.Active, u.UpdatedAt, u.ID,
+		u.Username, u.PasswordHash, u.Email, u.Role, u.Clearance, string(u.Department), u.RoleName, u.Active, u.UpdatedAt, u.ID,
 	)
 	return err
 }
@@ -100,4 +106,20 @@ func (r *UserRepository) Update(u *domain.User) error {
 func (r *UserRepository) Delete(id string) error {
 	_, err := r.db.Exec(`DELETE FROM users WHERE id = ?`, id)
 	return err
+}
+
+func (r *UserRepository) ExistsByRole(role domain.Role, excludeID string) (bool, error) {
+	var count int
+	err := r.db.QueryRow(
+		`SELECT COUNT(*) FROM users WHERE role = ? AND id != ?`, string(role), excludeID,
+	).Scan(&count)
+	return count > 0, err
+}
+
+func (r *UserRepository) ExistsByDepartmentAndRole(department domain.Department, role domain.Role, excludeID string) (bool, error) {
+	var count int
+	err := r.db.QueryRow(
+		`SELECT COUNT(*) FROM users WHERE department = ? AND role = ? AND id != ?`, string(department), string(role), excludeID,
+	).Scan(&count)
+	return count > 0, err
 }

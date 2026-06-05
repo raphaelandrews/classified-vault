@@ -14,15 +14,15 @@ const (
 func (c ClearanceLevel) String() string {
 	switch c {
 	case TierPublic:
-		return "PUBLIC NOTICE"
+		return "TOWN NOTICE"
 	case TierCouncil:
-		return "COUNCIL EYES ONLY"
+		return "GUILD SEALED"
 	case TierGuild:
-		return "GUILD BUSINESS"
+		return "COUNCIL SEALED"
 	case TierCorporate:
-		return "CORPORATE ACCESS"
+		return "VAULT SEALED"
 	case TierArcane:
-		return "ARCANE KNOWLEDGE"
+		return "ARCANE SEALED"
 	case TierJunimo:
 		return "JUNIMO SCRIPT"
 	default:
@@ -37,10 +37,10 @@ func (c ClearanceLevel) Label() string {
 type Role string
 
 const (
-	RoleMayor     Role = "mayor"
-	RoleKeeper    Role = "keeper"
-	RoleVillager  Role = "villager"
-	RoleAssociate Role = "associate"
+	RoleMayor     Role = "Mayor"
+	RoleKeeper    Role = "Director"
+	RoleVillager  Role = "Member"
+	RoleAssociate Role = "Visitor"
 )
 
 func MaxClearanceForRole(role Role) ClearanceLevel {
@@ -48,14 +48,35 @@ func MaxClearanceForRole(role Role) ClearanceLevel {
 	case RoleMayor:
 		return TierJunimo
 	case RoleKeeper:
-		return TierArcane
+		return TierCorporate
 	case RoleVillager:
-		return TierCouncil
+		return TierGuild
 	case RoleAssociate:
 		return TierPublic
 	default:
 		return TierPublic
 	}
+}
+
+type DepartmentRole struct {
+	Name      string
+	Clearance ClearanceLevel
+	IsLead    bool
+}
+
+var DepartmentRoles = map[Department][]string{
+	DepartmentMayorsOffice:     {"Mayor", "Secretary", "Clerk", "Director", "Member", "Visitor"},
+	DepartmentWizardsTower:     {"Archmage", "Enchanter", "Apprentice", "Director", "Member", "Visitor"},
+	DepartmentHarveysClinic:    {"Doctor", "Nurse", "Medic", "Director", "Member", "Visitor"},
+	DepartmentAdventurersGuild: {"Guildmaster", "Adventurer", "Scout", "Director", "Member", "Visitor"},
+	DepartmentMuseum:           {"Curator", "Archivist", "Docent", "Director", "Member", "Visitor"},
+	DepartmentJojaCorp:         {"Manager", "Supervisor", "Clerk", "Director", "Member", "Visitor"},
+	DepartmentCarpentersShop:   {"Master Builder", "Carpenter", "Apprentice", "Director", "Member", "Visitor"},
+	DepartmentCommunityCenter:  {"Coordinator", "Organizer", "Volunteer", "Director", "Member", "Visitor"},
+	DepartmentBulletinBoard:    {"Editor", "Scribe", "Crier", "Director", "Member", "Visitor"},
+	DepartmentQisOffice:        {"Agent", "Operative", "Courier", "Director", "Member", "Visitor"},
+	DepartmentPierDocks:        {"Harbormaster", "Sailor", "Fisher", "Director", "Member", "Visitor"},
+	DepartmentRovingTrader:     {"Merchant", "Trader", "Hawker", "Director", "Member", "Visitor"},
 }
 
 type Department string
@@ -73,4 +94,20 @@ const (
 	DepartmentBulletinBoard    Department = "Bulletin Board"
 	DepartmentQisOffice        Department = "Mr. Qi's Office"
 	DepartmentPierDocks        Department = "Pier & Docks"
+	DepartmentRovingTrader     Department = "Roving Trader"
 )
+
+var AllDepartments = []Department{
+	DepartmentMayorsOffice,
+	DepartmentWizardsTower,
+	DepartmentHarveysClinic,
+	DepartmentAdventurersGuild,
+	DepartmentMuseum,
+	DepartmentJojaCorp,
+	DepartmentCarpentersShop,
+	DepartmentCommunityCenter,
+	DepartmentBulletinBoard,
+	DepartmentQisOffice,
+	DepartmentPierDocks,
+	DepartmentRovingTrader,
+}

@@ -32,19 +32,7 @@ type UsersModel struct {
 }
 
 var addRoles = []domain.Role{domain.RoleAssociate, domain.RoleVillager, domain.RoleKeeper, domain.RoleMayor}
-var addDepts = []domain.Department{
-	domain.DepartmentMuseum,
-	domain.DepartmentBulletinBoard,
-	domain.DepartmentCommunityCenter,
-	domain.DepartmentCarpentersShop,
-	domain.DepartmentPierDocks,
-	domain.DepartmentAdventurersGuild,
-	domain.DepartmentHarveysClinic,
-	domain.DepartmentJojaCorp,
-	domain.DepartmentWizardsTower,
-	domain.DepartmentQisOffice,
-	domain.DepartmentMayorsOffice,
-}
+var addDepts = domain.AllDepartments
 
 func NewUsersModel(api *client.APIClient) UsersModel {
 	ui := textinput.New()
@@ -218,7 +206,11 @@ func (m *UsersModel) View() string {
 			if !u.Active {
 				status = "INACTIVE"
 			}
-			t.Row(marker, u.Username, string(u.Department), string(u.Role), styles.ClearanceBadge(u.Clearance.String()), status)
+			roleDisplay := u.RoleName
+			if roleDisplay == "" {
+				roleDisplay = string(u.Role)
+			}
+			t.Row(marker, u.Username, string(u.Department), roleDisplay, styles.ClearanceBadge(u.Clearance.String()), status)
 		}
 
 		sb.WriteString(t.Render())

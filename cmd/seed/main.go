@@ -36,26 +36,27 @@ func main() {
 		username   string
 		email      string
 		role       domain.Role
+		roleName   string
 		department domain.Department
 		tier       domain.ClearanceLevel
 		password   string
 	}
 
 	villagers := []villager{
-		{"lewis", "lewis@pelican.valley", domain.RoleMayor, domain.DepartmentMayorsOffice, domain.TierJunimo, "mayor123"},
-		{"marnie", "marnie@pelican.valley", domain.RoleMayor, domain.DepartmentMayorsOffice, domain.TierArcane, "deputy123"},
-		{"rasmodius", "rasmodius@pelican.valley", domain.RoleKeeper, domain.DepartmentWizardsTower, domain.TierArcane, "wizard123"},
-		{"morris", "morris@pelican.valley", domain.RoleKeeper, domain.DepartmentJojaCorp, domain.TierCorporate, "joja123"},
-		{"marlon", "marlon@pelican.valley", domain.RoleKeeper, domain.DepartmentAdventurersGuild, domain.TierGuild, "guild123"},
-		{"gil", "gil@pelican.valley", domain.RoleVillager, domain.DepartmentAdventurersGuild, domain.TierCouncil, "guild123"},
-		{"harvey", "harvey@pelican.valley", domain.RoleKeeper, domain.DepartmentHarveysClinic, domain.TierGuild, "clinic123"},
-		{"junimo", "junimo@pelican.valley", domain.RoleVillager, domain.DepartmentCommunityCenter, domain.TierCouncil, "bundle123"},
-		{"robin", "robin@pelican.valley", domain.RoleKeeper, domain.DepartmentCarpentersShop, domain.TierCouncil, "build123"},
-		{"gunther", "gunther@pelican.valley", domain.RoleAssociate, domain.DepartmentMuseum, domain.TierPublic, "museum123"},
-		{"gus", "gus@pelican.valley", domain.RoleAssociate, domain.DepartmentBulletinBoard, domain.TierPublic, "saloon123"},
-		{"qi", "qi@pelican.valley", domain.RoleKeeper, domain.DepartmentQisOffice, domain.TierJunimo, "qichallenge"},
-		{"willy", "willy@pelican.valley", domain.RoleKeeper, domain.DepartmentPierDocks, domain.TierCouncil, "fishmaster"},
-		{"krobus", "krobus@pelican.valley", domain.RoleAssociate, domain.DepartmentPierDocks, domain.TierPublic, "voidshadow"},
+		{"lewis", "lewis@pelican.valley", domain.RoleMayor, "", domain.DepartmentMayorsOffice, domain.TierJunimo, "mayor123"},
+		{"marnie", "marnie@pelican.valley", domain.RoleMayor, "Secretary", domain.DepartmentMayorsOffice, domain.TierArcane, "deputy123"},
+		{"rasmodius", "rasmodius@pelican.valley", domain.RoleKeeper, "Archmage", domain.DepartmentWizardsTower, domain.TierArcane, "wizard123"},
+		{"morris", "morris@pelican.valley", domain.RoleKeeper, "Manager", domain.DepartmentJojaCorp, domain.TierCorporate, "joja123"},
+		{"marlon", "marlon@pelican.valley", domain.RoleKeeper, "Guildmaster", domain.DepartmentAdventurersGuild, domain.TierGuild, "guild123"},
+		{"gil", "gil@pelican.valley", domain.RoleVillager, "Adventurer", domain.DepartmentAdventurersGuild, domain.TierCouncil, "guild123"},
+		{"harvey", "harvey@pelican.valley", domain.RoleKeeper, "Doctor", domain.DepartmentHarveysClinic, domain.TierGuild, "clinic123"},
+		{"junimo", "junimo@pelican.valley", domain.RoleVillager, "Volunteer", domain.DepartmentCommunityCenter, domain.TierCouncil, "bundle123"},
+		{"robin", "robin@pelican.valley", domain.RoleKeeper, "Master Builder", domain.DepartmentCarpentersShop, domain.TierCouncil, "build123"},
+		{"gunther", "gunther@pelican.valley", domain.RoleAssociate, "Docent", domain.DepartmentMuseum, domain.TierPublic, "museum123"},
+		{"gus", "gus@pelican.valley", domain.RoleAssociate, "Crier", domain.DepartmentBulletinBoard, domain.TierPublic, "saloon123"},
+		{"qi", "qi@pelican.valley", domain.RoleKeeper, "Agent", domain.DepartmentQisOffice, domain.TierJunimo, "qichallenge"},
+		{"willy", "willy@pelican.valley", domain.RoleKeeper, "Harbormaster", domain.DepartmentPierDocks, domain.TierCouncil, "fishmaster"},
+		{"krobus", "krobus@pelican.valley", domain.RoleAssociate, "Fisher", domain.DepartmentPierDocks, domain.TierPublic, "voidshadow"},
 	}
 
 	for _, v := range villagers {
@@ -65,11 +66,16 @@ func main() {
 			continue
 		}
 		h, _ := auth.HashPassword(v.password)
+		roleName := v.roleName
+		if roleName == "" {
+			roleName = string(v.role)
+		}
 		user := &domain.User{
 			ID:           "usr_" + uuid.New().String()[:12],
 			Username:     v.username,
 			Email:        v.email,
 			Role:         v.role,
+			RoleName:     roleName,
 			Clearance:    v.tier,
 			Department:   v.department,
 			Active:       true,

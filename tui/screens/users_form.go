@@ -141,7 +141,7 @@ func (m *UsersModel) viewAddForm() string {
 		if i == m.addRoleSel {
 			marker = "▶"
 		}
-		sb.WriteString(fmt.Sprintf("  %s %s\n", marker, r))
+		sb.WriteString(fmt.Sprintf("  %s %s\n", marker, string(r)))
 	}
 	sb.WriteString("\n")
 
