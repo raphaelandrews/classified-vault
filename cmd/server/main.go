@@ -22,6 +22,7 @@ import (
 
 	"classified-vault/config"
 	"classified-vault/internal/auth"
+	vaultcrypto "classified-vault/internal/crypto"
 	"classified-vault/internal/domain"
 	"classified-vault/internal/ds"
 	"classified-vault/internal/handler"
@@ -37,6 +38,9 @@ var (
 
 func main() {
 	cfg := config.Load()
+
+	vaultcrypto.InitVault(cfg.VaultKey, nil)
+	slog.Info("vault encryption initialized")
 
 	logger := setupLogger(cfg.Environment)
 	slog.SetDefault(logger)
@@ -103,6 +107,7 @@ func main() {
 	mux.Handle("POST /api/documents", api(middleware.RequireAnyRole(domain.RoleMayor, domain.RoleKeeper)(http.HandlerFunc(documentHandler.Create))))
 	mux.Handle("PUT /api/documents/{id}", api(middleware.RequireAnyRole(domain.RoleMayor, domain.RoleKeeper)(http.HandlerFunc(documentHandler.Update))))
 	mux.Handle("DELETE /api/documents/{id}", api(middleware.RequireRole(domain.RoleMayor)(http.HandlerFunc(documentHandler.Delete))))
+	mux.Handle("PUT /api/documents/{id}/transition", api(middleware.RequireAnyRole(domain.RoleMayor, domain.RoleKeeper)(http.HandlerFunc(documentHandler.Transition))))
 
 	mux.Handle("GET /api/users", api(middleware.RequireRole(domain.RoleMayor)(http.HandlerFunc(userHandler.List))))
 	mux.Handle("POST /api/users", api(middleware.RequireRole(domain.RoleMayor)(http.HandlerFunc(userHandler.Create))))

@@ -15,6 +15,7 @@ type DocumentService interface {
 	Create(session auth.Session, doc *domain.Document) (*domain.Document, error)
 	Update(session auth.Session, id string, doc *domain.Document) (*domain.Document, error)
 	Delete(session auth.Session, id string) error
+	Transition(session auth.Session, id string, to domain.DocumentStatus) (*domain.Document, error)
 	Catalog() ([]repository.DocMetadata, error)
 }
 
@@ -131,6 +132,31 @@ func (h *DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusNoContent, nil)
+}
+
+func (h *DocumentHandler) Transition(w http.ResponseWriter, r *http.Request) {
+	session := requireSession(w, r)
+	if session == nil {
+		return
+	}
+
+	id := r.PathValue("id")
+
+	var req struct {
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	doc, err := h.service.Transition(*session, id, domain.DocumentStatus(req.Status))
+	if err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, doc)
 }
 
 func (h *DocumentHandler) Catalog(w http.ResponseWriter, r *http.Request) {

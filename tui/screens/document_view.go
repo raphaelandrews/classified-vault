@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
 
 	"classified-vault/internal/domain"
 	"classified-vault/tui/styles"
@@ -41,6 +42,9 @@ func (m *DocumentViewModel) buildContent() string {
 	var sb strings.Builder
 	sb.WriteString(header + "\n\n")
 	sb.WriteString(styles.DocMeta.Render(
+		fmt.Sprintf("Status:     %s", statusBadge(m.doc.Status)),
+	) + "\n")
+	sb.WriteString(styles.DocMeta.Render(
 		fmt.Sprintf("Tier:       %s", styles.ClearanceBadge(m.doc.Classification.String())),
 	) + "\n")
 	sb.WriteString(styles.DocMeta.Render(
@@ -66,6 +70,11 @@ func (m *DocumentViewModel) buildContent() string {
 		sb.WriteString(styles.DocMeta.Render(
 			fmt.Sprintf("Refs:       %s", strings.Join(m.doc.ReferenceIDs, ", ")),
 		) + "\n")
+	}
+
+	if !m.doc.VerifyIntegrity() {
+		sb.WriteString("\n")
+		sb.WriteString(styles.ErrorStyle.Render("⚠ TAMPERING DETECTED — content hash mismatch") + "\n")
 	}
 
 	r, err := glamour.NewTermRenderer(
@@ -121,4 +130,21 @@ func (m *DocumentViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *DocumentViewModel) View() string {
 	footer := styles.StatusBarStyle.Width(m.width).Render("[↑/↓] Scroll  [h] Back  [q] Quit  [?] Help")
 	return m.viewport.View() + "\n" + footer
+}
+
+func statusBadge(s domain.DocumentStatus) string {
+	switch s {
+	case domain.StatusDraft:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#928374")).Render("[ DRAFT    ]")
+	case domain.StatusReview:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#d8a657")).Render("[ REVIEW   ]")
+	case domain.StatusFrozen:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#83a598")).Render("[ FROZEN   ]")
+	case domain.StatusArchived:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#928374")).Render("[ ARCHIVED ]")
+	case domain.StatusPublic:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#a9b665")).Render("[ PUBLIC   ]")
+	default:
+		return lipgloss.NewStyle().Foreground(styles.Dimmed).Render("[ " + string(s) + " ]")
+	}
 }

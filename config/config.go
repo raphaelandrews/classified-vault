@@ -12,6 +12,7 @@ type Config struct {
 	DatabasePath  string
 	JWTSecret     string
 	AdminPassword string
+	VaultKey      string
 	ServerPort    string
 	ServerURL     string
 	SessionTTL    time.Duration
@@ -23,6 +24,7 @@ func Load() *Config {
 		DatabasePath:  getEnv("DATABASE_PATH", "./vault.db"),
 		JWTSecret:     getEnv("JWT_SECRET", "change-me-in-production"),
 		AdminPassword: getEnv("INITIAL_MAYOR_PASSWORD", "mayor123"),
+		VaultKey:      getEnv("VAULT_KEY", "pelican-town-master-key"),
 		ServerPort:    getEnv("PORT", "8080"),
 		ServerURL:     getEnv("SERVER_URL", "http://localhost:8080"),
 		SessionTTL:    parseDuration(getEnv("SESSION_TTL", "8h")),

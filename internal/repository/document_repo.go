@@ -22,7 +22,7 @@ func scanDoc(rows *sql.Rows) (*domain.Document, error) {
 	var tagsJSON string
 	var department string
 	var folder, refIDs sql.NullString
-	if err := rows.Scan(&d.ID, &d.Title, &d.Content, &d.Classification, &d.Status, &department, &folder, &tagsJSON, &refIDs, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt); err != nil {
+	if err := rows.Scan(&d.ID, &d.Title, &d.Content, &d.Classification, &d.Status, &department, &folder, &tagsJSON, &refIDs, &d.ContentHash, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt); err != nil {
 		return nil, err
 	}
 	d.Department = domain.Department(department)
@@ -43,7 +43,7 @@ func scanDocRow(row *sql.Row) (*domain.Document, error) {
 	var tagsJSON string
 	var department string
 	var folder, refIDs sql.NullString
-	err := row.Scan(&d.ID, &d.Title, &d.Content, &d.Classification, &d.Status, &department, &folder, &tagsJSON, &refIDs, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt)
+	err := row.Scan(&d.ID, &d.Title, &d.Content, &d.Classification, &d.Status, &department, &folder, &tagsJSON, &refIDs, &d.ContentHash, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -63,7 +63,7 @@ func scanDocRow(row *sql.Row) (*domain.Document, error) {
 	return &d, nil
 }
 
-const docColumns = `id, title, content, classification, status, department, folder, tags, reference_ids, created_by, created_at, updated_at`
+const docColumns = `id, title, content, classification, status, department, folder, tags, reference_ids, content_hash, created_by, created_at, updated_at`
 
 func (r *DocumentRepository) FindAll() ([]*domain.Document, error) {
 	rows, err := r.db.Query(
@@ -139,9 +139,9 @@ func (r *DocumentRepository) Create(d *domain.Document) error {
 	}
 
 	_, err := r.db.Exec(
-		`INSERT INTO documents (id, title, content, classification, status, department, folder, tags, reference_ids, created_by, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		d.ID, d.Title, d.Content, d.Classification, d.Status, string(d.Department), d.Folder, string(tagsJSON), string(refsJSON), d.CreatedBy, d.CreatedAt, d.UpdatedAt,
+		`INSERT INTO documents (id, title, content, classification, status, department, folder, tags, reference_ids, content_hash, created_by, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		d.ID, d.Title, d.Content, d.Classification, d.Status, string(d.Department), d.Folder, string(tagsJSON), string(refsJSON), d.ContentHash, d.CreatedBy, d.CreatedAt, d.UpdatedAt,
 	)
 	return err
 }
@@ -159,9 +159,9 @@ func (r *DocumentRepository) Update(d *domain.Document) error {
 	}
 
 	_, err := r.db.Exec(
-		`UPDATE documents SET title=?, content=?, classification=?, status=?, department=?, folder=?, tags=?, reference_ids=?, updated_at=?
+		`UPDATE documents SET title=?, content=?, classification=?, status=?, department=?, folder=?, tags=?, reference_ids=?, content_hash=?, updated_at=?
 		 WHERE id=?`,
-		d.Title, d.Content, d.Classification, d.Status, string(d.Department), d.Folder, string(tagsJSON), string(refsJSON), d.UpdatedAt, d.ID,
+		d.Title, d.Content, d.Classification, d.Status, string(d.Department), d.Folder, string(tagsJSON), string(refsJSON), d.ContentHash, d.UpdatedAt, d.ID,
 	)
 	return err
 }
@@ -176,7 +176,7 @@ type DocMetadata struct {
 	Title          string    `json:"title"`
 	Classification int       `json:"classification"`
 	Status         string    `json:"status"`
-	Department        string    `json:"department"`
+	Department     string    `json:"department"`
 	Folder         string    `json:"folder"`
 	Tags           []string  `json:"tags"`
 	CreatedBy      string    `json:"created_by"`

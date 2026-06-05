@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"classified-vault/internal/auth"
+	vaultcrypto "classified-vault/internal/crypto"
 	"classified-vault/internal/domain"
 	"classified-vault/internal/ds"
 	"classified-vault/internal/repository"
@@ -52,6 +53,7 @@ func (s *DocumentService) List(session auth.Session) ([]*domain.Document, error)
 	var filtered []*domain.Document
 	for _, doc := range docs {
 		if canAccess(session, doc) {
+			doc.Content = decryptContent(doc.Content)
 			filtered = append(filtered, doc)
 		}
 	}
@@ -79,6 +81,8 @@ func (s *DocumentService) GetByID(session auth.Session, docID string) (*domain.D
 		return nil, fmt.Errorf("access denied")
 	}
 
+	doc.Content = decryptContent(doc.Content)
+
 	s.logAudit(domain.AuditLog{
 		UserID:   session.UserID,
 		Username: session.Username,
@@ -94,11 +98,13 @@ func (s *DocumentService) Create(session auth.Session, doc *domain.Document) (*d
 	doc.ID = "scr_" + uuid.New().String()[:8]
 	doc.CreatedBy = session.UserID
 	if doc.Status == "" {
-		doc.Status = domain.StatusActive
+		doc.Status = domain.StatusDraft
 	}
 	if doc.Department == "" {
 		doc.Department = session.Department
 	}
+	doc.ContentHash = doc.ComputeHash()
+	doc.Content = encryptContent(doc.Content)
 
 	if err := s.repo.Create(doc); err != nil {
 		return nil, err
@@ -145,6 +151,8 @@ func (s *DocumentService) Update(session auth.Session, id string, doc *domain.Do
 	}
 
 	doc.ID = id
+	doc.ContentHash = doc.ComputeHash()
+	doc.Content = encryptContent(doc.Content)
 	if err := s.repo.Update(doc); err != nil {
 		return nil, err
 	}
@@ -155,6 +163,50 @@ func (s *DocumentService) Update(session auth.Session, id string, doc *domain.Do
 		Action:   domain.ActionScrollUpdate,
 		Resource: "scroll:" + id,
 		Success:  true,
+	})
+
+	return doc, nil
+}
+
+func (s *DocumentService) Transition(session auth.Session, id string, to domain.DocumentStatus) (*domain.Document, error) {
+	doc, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if doc == nil {
+		return nil, fmt.Errorf("document not found")
+	}
+
+	if !canAccess(session, doc) {
+		return nil, fmt.Errorf("access denied")
+	}
+
+	if !domain.CanTransition(doc.Status, to) {
+		return nil, fmt.Errorf("cannot transition from %s to %s", doc.Status, to)
+	}
+
+	if domain.TransitionRequiresMayor(to) && session.Role != domain.RoleMayor {
+		return nil, fmt.Errorf("only the Mayor can transition to %s", to)
+	}
+
+	if to == domain.StatusFrozen {
+		doc.Content = decryptContent(doc.Content)
+		doc.ContentHash = doc.ComputeHash()
+		doc.Content = encryptContent(doc.Content)
+	}
+
+	doc.Status = to
+	if err := s.repo.Update(doc); err != nil {
+		return nil, err
+	}
+
+	s.logAudit(domain.AuditLog{
+		UserID:   session.UserID,
+		Username: session.Username,
+		Action:   domain.ActionScrollUpdate,
+		Resource: "scroll:" + id,
+		Success:  true,
+		Details:  fmt.Sprintf("status %s → %s", doc.Status, to),
 	})
 
 	return doc, nil
@@ -202,6 +254,25 @@ func (s *DocumentService) Delete(session auth.Session, id string) error {
 
 func (s *DocumentService) Catalog() ([]repository.DocMetadata, error) {
 	return s.repo.FindAllMetadata()
+}
+
+func encryptContent(content string) string {
+	enc, err := vaultcrypto.Encrypt(content)
+	if err != nil {
+		return content
+	}
+	return enc
+}
+
+func decryptContent(content string) string {
+	if !vaultcrypto.IsEncrypted(content) {
+		return content
+	}
+	dec, err := vaultcrypto.Decrypt(content)
+	if err != nil {
+		return "[VAULT ERROR: cannot decrypt]"
+	}
+	return dec
 }
 
 func canAccess(session auth.Session, doc *domain.Document) bool {

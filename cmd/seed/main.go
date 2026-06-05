@@ -470,7 +470,7 @@ func main() {
 			Title:          s.title,
 			Content:        s.content,
 			Classification: s.tier,
-			Status:         domain.StatusActive,
+			Status:         domain.StatusDraft,
 			Department:     s.department,
 			Folder:         s.folder,
 			Tags:           s.tags,

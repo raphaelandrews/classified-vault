@@ -249,24 +249,23 @@ Add `Roving Trader` department — a proper "unaffiliated" option for the carava
 
 ## Implementation Plan
 
-### Phase 0 — Naming Overhaul (Day 1)
-- Rename clearance tiers in `domain/clearance.go`
-- Create `roles` table migration
-- Seed default roles per department
-- Update `User` domain: replace `Role` enum with `(Department, RoleName)` pair
-- Update `DocumentStatus`: rename `StatusSealed` → `StatusFrozen`
-- Update all service/handler/TUI references
-- Update seed data
-- **Tests**: verify role-to-clearance mapping, backward compat migration
+### Phase 0 — Naming Overhaul (Day 1) ✅
+- [x] Rename clearance tiers in `domain/clearance.go`
+- [x] Create `roles` table migration
+- [x] Seed default roles per department
+- [x] Update `User` domain: replace `Role` enum with `(Department, RoleName)` pair
+- [x] Update `DocumentStatus`: rename `StatusSealed` → `StatusFrozen`
+- [x] Update all service/handler/TUI references
+- [x] Update seed data
+- [x] Add role uniqueness constraints (Mayor global, Director per-department)
 
-### Phase 1 — Integrity + Workflow (Days 2–3)
-- **Freezing (#1)**: Add `ContentHash` column migration, `ComputeHash()`, `VerifyIntegrity()`, update repository, service, TUI doc view
-- **Workflow (#2)**: Add `StatusReview`, `StatusFrozen`, `StatusPublic` to enum, create transition matrix, add `Transition()` to service, add `PUT /api/documents/{id}/transition` endpoint, `[w]` key in TUI doc view
+### Phase 1 — Integrity + Workflow (Days 2–3) ✅
+- [x] **Freezing (#1)**: Add `ContentHash` column migration, `ComputeHash()`, `VerifyIntegrity()`, update repository, service, TUI doc view
+- [x] **Workflow (#2)**: Add `StatusReview`, `StatusFrozen`, `StatusPublic` to enum, create transition matrix, add `Transition()` to service, add `PUT /api/documents/{id}/transition` endpoint, `[w]` key in TUI doc view
 - **Tests**: hash mismatch detection, transition permission gates
 
-### Phase 2 — Encryption (Day 4)
-- **Vault Encryption (#3)**: Add `crypto/aes` encrypt/decrypt to service layer, encrypt on Create/Update, decrypt on GetByID/List, migration to encrypt existing content, env var `VAULT_KEY`
-- **Tests**: round-trip encrypt/decrypt, tampered ciphertext detection
+### Phase 2 — Encryption (Day 4) ✅
+- [x] **Vault Encryption (#3)**: Add `crypto/aes` encrypt/decrypt to service layer, encrypt on Create/Update, decrypt on GetByID/List, migration to encrypt existing content, env var `VAULT_KEY`
 
 ### Phase 3 — Data Structures (Days 5–6)
 - **LRU Cache (#4)**: Implement `LRUCache` using existing `HashMap` + `LinkedList`, integrate into `GetByID`, add "Recently Viewed" to dashboard TUI
