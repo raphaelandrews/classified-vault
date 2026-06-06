@@ -61,6 +61,19 @@ func (c *APIClient) GetMe() (*domain.User, error) {
 	return &user, nil
 }
 
+func (c *APIClient) ChangePassword(currentPassword, newPassword string) error {
+	_, _, err := c.doRequest("PUT", "/api/me/password", map[string]string{
+		"current_password": currentPassword,
+		"new_password":     newPassword,
+	})
+	return err
+}
+
+func (c *APIClient) RefreshSession() error {
+	_, _, err := c.doRequest("PUT", "/api/me/refresh", nil)
+	return err
+}
+
 func (c *APIClient) Register(username, password, department string) (*domain.User, error) {
 	resp, body, err := c.do("POST", "/auth/register", map[string]string{
 		"username":   username,

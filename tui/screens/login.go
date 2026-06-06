@@ -179,6 +179,9 @@ func (m *LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "s":
+			if m.username.Focused() || m.password.Focused() {
+				break
+			}
 			if m.mode == 0 {
 				m.mode = 1
 				m.focusIdx = 0
@@ -266,7 +269,7 @@ func (m *LoginModel) View() string {
 
 		body.WriteString(rowStyle.Render(marker0+styles.DocPrompt.Render("Username:")+" "+inputStyle.Render(m.username.View())) + "\n")
 		body.WriteString(rowStyle.Render(marker1+styles.DocPrompt.Render("Password:")+" "+inputStyle.Render(m.password.View())) + "\n")
-		body.WriteString("\n")
+		body.WriteString(rowStyle.Render("  "+styles.DocMeta.Render("8+ chars, letters + numbers/symbols")) + "\n\n")
 		body.WriteString(rowStyle.Render(marker2+styles.DocPrompt.Render("Department (optional):")) + "\n")
 
 		for i := -1; i < len(registerDepts); i++ {

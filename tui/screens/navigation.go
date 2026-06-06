@@ -14,6 +14,7 @@ const (
 	ScreenAccessDenied
 	ScreenUsers
 	ScreenAudit
+	ScreenPasswordChange
 )
 
 type NavigateMsg struct {

@@ -71,3 +71,24 @@ func (rl *RateLimiter) cleanup(interval time.Duration) {
 		rl.mu.Unlock()
 	}
 }
+
+type LoginRateLimiter struct {
+	inner *RateLimiter
+}
+
+func NewLoginRateLimiter(limit int, window time.Duration) *LoginRateLimiter {
+	return &LoginRateLimiter{inner: NewRateLimiter(limit, window)}
+}
+
+func (lrl *LoginRateLimiter) Handler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !lrl.inner.allow(r.RemoteAddr) {
+			w.Header().Set("Retry-After", "60")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			w.Write([]byte(`{"error":"too many login attempts, wait 1 minute"}`))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}

@@ -61,10 +61,13 @@ func main() {
 	sessionCache := ds.NewHashMap[auth.Session](256)
 	auditBuffer := ds.NewLinkedList[domain.AuditLog]()
 	documentIndex := ds.NewAVLTree()
+	lruCache := ds.NewLRUCache(200, 1*time.Hour)
+	scrollTrie := ds.NewTrie()
 
 	userRepo := repository.NewUserRepository(db)
 	documentRepo := repository.NewDocumentRepository(db)
 	auditRepo := repository.NewAuditRepository(db)
+	statsRepo := repository.NewStatsRepository(db)
 
 	docs, err := documentRepo.FindAll()
 	if err != nil {
@@ -73,13 +76,15 @@ func main() {
 	}
 	for _, doc := range docs {
 		documentIndex.Insert(int(doc.Classification), doc.ID)
+		scrollTrie.Insert(doc.Title, doc.ID)
 	}
 	slog.Info("scroll index built", "count", len(docs))
 
 	authService := service.NewAuthService(userRepo, sessionCache, cfg)
-	documentService := service.NewDocumentService(documentRepo, documentIndex, auditBuffer, auditRepo)
+	documentService := service.NewDocumentService(documentRepo, documentIndex, auditBuffer, auditRepo, lruCache, scrollTrie)
 	userService := service.NewUserService(userRepo, auditBuffer, auditRepo)
 	auditService := service.NewAuditService(auditRepo, auditBuffer)
+	statsService := service.NewStatsService(statsRepo)
 
 	if err := userService.SeedMayor(cfg.AdminPassword); err != nil {
 		slog.Error("failed to seed mayor", "error", err)
@@ -90,20 +95,30 @@ func main() {
 	documentHandler := handler.NewDocumentHandler(documentService)
 	userHandler := handler.NewUserHandler(userService)
 	auditHandler := handler.NewAuditHandler(auditService)
+	statsHandler := handler.NewStatsHandler(statsService)
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("POST /auth/login", authHandler.Login)
+	loginLimiter := middleware.NewLoginRateLimiter(5, 1*time.Minute)
+
+	mux.Handle("POST /auth/login", loginLimiter.Handler(http.HandlerFunc(authHandler.Login)))
 	mux.HandleFunc("POST /auth/logout", authHandler.Logout)
 	mux.HandleFunc("POST /auth/register", authHandler.Register)
 
 	api := middleware.RequireAuth(sessionCache)
 
 	mux.Handle("GET /api/me", api(http.HandlerFunc(authHandler.Me)))
+	mux.Handle("PUT /api/me/refresh", api(http.HandlerFunc(authHandler.RefreshSession)))
+	mux.Handle("PUT /api/me/password", api(http.HandlerFunc(authHandler.ChangePassword)))
+	mux.Handle("GET /api/me/recent", api(http.HandlerFunc(documentHandler.Recent)))
 
 	mux.Handle("GET /api/documents", api(http.HandlerFunc(documentHandler.List)))
-	mux.Handle("GET /api/documents/{id}", api(http.HandlerFunc(documentHandler.Get)))
+	mux.Handle("GET /api/documents/search", api(http.HandlerFunc(documentHandler.Search)))
+	mux.Handle("GET /api/documents/autocomplete", api(http.HandlerFunc(documentHandler.Autocomplete)))
+	mux.Handle("GET /api/documents/featured", api(http.HandlerFunc(documentHandler.Featured)))
 	mux.Handle("GET /api/catalog", api(http.HandlerFunc(documentHandler.Catalog)))
+	mux.Handle("GET /api/documents/{id}", api(http.HandlerFunc(documentHandler.Get)))
+	mux.Handle("GET /api/documents/{id}/export", api(http.HandlerFunc(documentHandler.Export)))
 	mux.Handle("POST /api/documents", api(middleware.RequireAnyRole(domain.RoleMayor, domain.RoleKeeper)(http.HandlerFunc(documentHandler.Create))))
 	mux.Handle("PUT /api/documents/{id}", api(middleware.RequireAnyRole(domain.RoleMayor, domain.RoleKeeper)(http.HandlerFunc(documentHandler.Update))))
 	mux.Handle("DELETE /api/documents/{id}", api(middleware.RequireRole(domain.RoleMayor)(http.HandlerFunc(documentHandler.Delete))))
@@ -115,6 +130,7 @@ func main() {
 	mux.Handle("DELETE /api/users/{id}", api(middleware.RequireRole(domain.RoleMayor)(http.HandlerFunc(userHandler.Delete))))
 
 	mux.Handle("GET /api/audit", api(middleware.RequireRole(domain.RoleMayor)(http.HandlerFunc(auditHandler.List))))
+	mux.Handle("GET /api/stats", api(http.HandlerFunc(statsHandler.GetStats)))
 
 	mux.HandleFunc("GET /health", healthHandler(db))
 

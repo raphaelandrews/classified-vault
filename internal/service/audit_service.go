@@ -21,15 +21,14 @@ func NewAuditService(
 	}
 }
 
-func (s *AuditService) List(limit int) ([]*domain.AuditLog, error) {
-	dbLogs, err := s.auditRepo.FindAll(limit)
-	if err != nil {
-		return nil, err
-	}
-
-	return dbLogs, nil
+func (s *AuditService) List(limit, offset int) ([]*domain.AuditLog, error) {
+	return s.auditRepo.FindAll(limit, offset)
 }
 
-func (s *AuditService) ListByUser(userID string, limit int) ([]*domain.AuditLog, error) {
-	return s.auditRepo.FindByUser(userID, limit)
+func (s *AuditService) Count() (int, error) {
+	return s.auditRepo.Count()
+}
+
+func (s *AuditService) ListByUser(userID string, limit, offset int) ([]*domain.AuditLog, error) {
+	return s.auditRepo.FindByUser(userID, limit, offset)
 }

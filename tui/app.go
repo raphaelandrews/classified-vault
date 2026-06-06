@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -18,23 +19,26 @@ type Model struct {
 
 	apiClient *client.APIClient
 
-	loginModel        *screens.LoginModel
-	dashModel         *screens.DashboardModel
-	docListModel      *screens.DocumentListModel
-	docViewModel      *screens.DocumentViewModel
-	docCreateModel    *screens.DocCreateModel
-	docEditModel      *screens.DocEditModel
-	accessDeniedModel *screens.AccessDeniedModel
-	usersModel        *screens.UsersModel
-	auditModel        *screens.AuditLogModel
+	loginModel          *screens.LoginModel
+	dashModel           *screens.DashboardModel
+	docListModel        *screens.DocumentListModel
+	docViewModel        *screens.DocumentViewModel
+	docCreateModel      *screens.DocCreateModel
+	docEditModel        *screens.DocEditModel
+	accessDeniedModel   *screens.AccessDeniedModel
+	usersModel          *screens.UsersModel
+	auditModel          *screens.AuditLogModel
+	passwordChangeModel *screens.PasswordChangeModel
 
-	current  tea.Model
-	width    int
-	height   int
-	themeIdx int
+	current     tea.Model
+	width       int
+	height      int
+	themeIdx    int
+	breadcrumbs []string
 
-	confirm  *screens.ConfirmPromptMsg
-	showHelp bool
+	confirm         *screens.ConfirmPromptMsg
+	showHelp        bool
+	lastRefreshTime time.Time
 }
 
 func New(serverURL string) *Model {
@@ -83,11 +87,34 @@ func (m *Model) helpView() string {
 		sb.WriteString("[j/k] Move cursor\n[a] Register villager\n[d] Dismiss villager\n[r] Refresh\n[q] Back\n[?] Close help")
 	case screens.ScreenAudit:
 		sb.WriteString("[←/→] Page\n[r] Refresh\n[q] Back\n[?] Close help")
+	case screens.ScreenPasswordChange:
+		sb.WriteString("[Tab] Next field\n[Enter] Submit\n[Esc/q] Dashboard\n[?] Close help")
 	default:
 		sb.WriteString("[?] Close help")
 	}
 
 	return styles.BorderStyle.Render(sb.String())
+}
+
+func (m *Model) maybeRefreshSession() tea.Cmd {
+	if m.screen == screens.ScreenLogin {
+		return nil
+	}
+	if m.apiClient.SessionExpiresAt.IsZero() {
+		return nil
+	}
+	fiveMin := time.Now().Add(5 * time.Minute)
+	if m.apiClient.SessionExpiresAt.After(fiveMin) {
+		return nil
+	}
+	if time.Since(m.lastRefreshTime) < 1*time.Minute {
+		return nil
+	}
+	m.lastRefreshTime = time.Now()
+	return func() tea.Msg {
+		m.apiClient.RefreshSession()
+		return nil
+	}
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -144,10 +171,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if err != nil {
 			return m, nil
 		}
-		dvm := screens.NewDocumentViewModel(doc, m.apiClient.User)
+		dvm := screens.NewDocumentViewModelWithClient(doc, m.apiClient.User, m.apiClient)
 		m.docViewModel = &dvm
 		m.screen = screens.ScreenDocView
 		m.current = m.docViewModel
+		m.breadcrumbs = []string{"Dashboard", "Scrolls", doc.Title}
 		return m, tea.Batch(m.current.Init(), m.resizeCmd())
 
 	case screens.EditDocMsg:
@@ -175,6 +203,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	updated, cmd := m.current.Update(msg)
 	m.current = updated
+	if refreshCmd := m.maybeRefreshSession(); refreshCmd != nil {
+		return m, tea.Batch(cmd, refreshCmd)
+	}
 	return m, cmd
 }
 
@@ -185,36 +216,65 @@ func (m *Model) handleNavigate(msg screens.NavigateMsg) (tea.Model, tea.Cmd) {
 		m.loginModel = &lm
 		m.screen = screens.ScreenLogin
 		m.current = m.loginModel
+		m.breadcrumbs = []string{"Login"}
 
 	case screens.ScreenDashboard:
 		dm := screens.NewDashboardModel(m.apiClient, m.apiClient.User)
 		m.dashModel = &dm
 		m.screen = screens.ScreenDashboard
 		m.current = m.dashModel
+		m.breadcrumbs = []string{"Dashboard"}
 
 	case screens.ScreenDocList:
 		dlm := screens.NewDocumentListModel(m.apiClient, m.apiClient.User)
 		m.docListModel = &dlm
 		m.screen = screens.ScreenDocList
 		m.current = m.docListModel
+		m.breadcrumbs = []string{"Dashboard", "Scrolls"}
 
 	case screens.ScreenDocCreate:
 		dcm := screens.NewDocCreateModel(m.apiClient, m.apiClient.User)
 		m.docCreateModel = &dcm
 		m.screen = screens.ScreenDocCreate
 		m.current = m.docCreateModel
+		m.breadcrumbs = []string{"Dashboard", "Scrolls", "New"}
+
+	case screens.ScreenDocEdit:
+		if msg.Data != nil {
+			if editMsg, ok := msg.Data.(screens.EditDocMsg); ok {
+				dem := screens.NewDocEditModel(m.apiClient, m.apiClient.User, editMsg)
+				m.docEditModel = &dem
+				m.screen = screens.ScreenDocEdit
+				m.current = m.docEditModel
+				m.breadcrumbs = []string{"Dashboard", "Scrolls", "Edit: " + editMsg.Title}
+				return m, m.current.Init()
+			}
+		}
+		return m, nil
 
 	case screens.ScreenUsers:
 		um := screens.NewUsersModel(m.apiClient)
 		m.usersModel = &um
 		m.screen = screens.ScreenUsers
 		m.current = m.usersModel
+		m.breadcrumbs = []string{"Dashboard", "Villagers"}
 
 	case screens.ScreenAudit:
 		am := screens.NewAuditLogModel(m.apiClient)
 		m.auditModel = &am
 		m.screen = screens.ScreenAudit
 		m.current = m.auditModel
+		m.breadcrumbs = []string{"Dashboard", "Ledger"}
+
+	case screens.ScreenAccessDenied:
+		return m, nil
+
+	case screens.ScreenPasswordChange:
+		pcm := screens.NewPasswordChangeModel(m.apiClient)
+		m.passwordChangeModel = &pcm
+		m.screen = screens.ScreenPasswordChange
+		m.current = m.passwordChangeModel
+		m.breadcrumbs = []string{"Dashboard", "Password"}
 	}
 
 	return m, m.current.Init()
@@ -249,5 +309,33 @@ func (m *Model) View() string {
 		return overlay.Render(lipgloss.Place(m.width, m.height-1, lipgloss.Center, lipgloss.Center, box))
 	}
 
+	if m.screen != screens.ScreenLogin && !m.apiClient.SessionExpiresAt.IsZero() {
+		remaining := time.Until(m.apiClient.SessionExpiresAt)
+		if remaining > 0 && remaining < 5*time.Minute {
+			minutes := int(remaining.Minutes())
+			if minutes < 1 {
+				minutes = 1
+			}
+			banner := lipgloss.NewStyle().Foreground(styles.Warning).Bold(true).Render(
+				fmt.Sprintf("⚠ Session expires in %d minutes", minutes),
+			)
+			view = banner + "\n" + view
+		}
+	}
+
+	if len(m.breadcrumbs) > 0 && m.screen != screens.ScreenLogin {
+		breadcrumbBar := m.renderBreadcrumbs()
+		return lipgloss.JoinVertical(lipgloss.Left, breadcrumbBar, view)
+	}
+
 	return view
+}
+
+func (m *Model) renderBreadcrumbs() string {
+	var parts []string
+	for _, crumb := range m.breadcrumbs {
+		parts = append(parts, crumb)
+	}
+	trail := strings.Join(parts, " > ")
+	return styles.DocMeta.Render(trail)
 }

@@ -39,6 +39,8 @@ func RequireAuth(cache *ds.HashMap[auth.Session]) func(http.Handler) http.Handle
 			ctx := r.Context()
 			ctx = contextWithSession(ctx, session)
 			ctx = contextWithToken(ctx, token)
+
+			w.Header().Set("X-Session-Expires", session.ExpiresAt.Format(time.RFC3339))
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

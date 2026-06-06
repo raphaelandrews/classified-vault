@@ -184,10 +184,49 @@ type DocMetadata struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
-func (r *DocumentRepository) FindAllMetadata() ([]DocMetadata, error) {
+func (r *DocumentRepository) FindAllMetadata(limit, offset int) ([]DocMetadata, error) {
 	rows, err := r.db.Query(
 		`SELECT id, title, classification, status, department, folder, tags, created_by, created_at, updated_at
-		 FROM documents ORDER BY created_at DESC`,
+		 FROM documents ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+		limit, offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var docs []DocMetadata
+	for rows.Next() {
+		var d DocMetadata
+		var tagsJSON string
+		var folder sql.NullString
+		if err := rows.Scan(&d.ID, &d.Title, &d.Classification, &d.Status, &d.Department, &folder, &tagsJSON, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt); err != nil {
+			return nil, err
+		}
+		d.Folder = folder.String
+		json.Unmarshal([]byte(tagsJSON), &d.Tags)
+		if d.Tags == nil {
+			d.Tags = []string{}
+		}
+		docs = append(docs, d)
+	}
+	return docs, rows.Err()
+}
+
+func (r *DocumentRepository) Count() (int, error) {
+	var count int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM documents`).Scan(&count)
+	return count, err
+}
+
+func (r *DocumentRepository) SearchContent(query string) ([]DocMetadata, error) {
+	rows, err := r.db.Query(
+		`SELECT d.id, d.title, d.classification, d.status, d.department, d.folder, d.tags, d.created_by, d.created_at, d.updated_at
+		 FROM documents d
+		 INNER JOIN documents_fts fts ON d.rowid = fts.rowid
+		 WHERE documents_fts MATCH ?
+		 ORDER BY rank LIMIT 50`,
+		query,
 	)
 	if err != nil {
 		return nil, err

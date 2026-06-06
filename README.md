@@ -20,14 +20,14 @@ Default mayor credentials: `lewis` / `mayor123`
 ## Architecture
 
 ```
-┌──────────────┐     HTTP/JSON     ┌──────────────────┐
-│  TUI Client  │ ◄──────────────► │   Go Backend      │
-│ (Bubble Tea) │                   │  (net/http, stdlib)│
-└──────────────┘                   │  ┌──────────────┐ │
-                                   │  │   SQLite     │ │
-                                   │  │  (WAL mode)  │ │
-                                   │  └──────────────┘ │
-                                   └──────────────────┘
+┌──────────────┐     HTTP/JSON     ┌──────────────────────────────────────┐
+│  TUI Client  │ ◄──────────────► │          Go Backend                   │
+│ (Bubble Tea) │                   │  (net/http, stdlib)                   │
+└──────────────┘                   │  ┌─────────────────────────────────┐ │
+                                   │  │  SQLite (WAL mode + FTS5)       │ │
+                                   │  │  AES-256-GCM encrypted content  │ │
+                                   │  └─────────────────────────────────┘ │
+                                   └──────────────────────────────────────┘
 ```
 
 ## Access Control Model — Departments & Tiers
@@ -36,7 +36,7 @@ Every scroll belongs to a **department**. Every villager works for a **departmen
 
 | # | Rule | Description |
 |---|---|---|
-| 1 | **Public Notice** | Tier 0 scrolls are visible to everyone, regardless of department |
+| 1 | **Town Notice** | Tier 0 scrolls are visible to everyone, regardless of department |
 | 2 | **Department Scope** | Same department AND villager tier ≥ scroll tier → access granted |
 | 3 | **Mayor Oversight** | Mayor's Office with tier ≥ 4 can see ALL scrolls across all departments |
 | 4 | **Arcane Bypass** | Wizard's Tower can see any scroll tagged `arcane` from any department |
@@ -45,19 +45,19 @@ Every scroll belongs to a **department**. Every villager works for a **departmen
 
 | Tier | Name | Badge | Description |
 |---|---|---|---|
-| 0 | **Public Notice** | Gray | Town bulletin, festival announcements — visible to ALL |
-| 1 | **Council Eyes Only** | Green | Community center, carpenter's shop, pier & docks |
-| 2 | **Guild Business** | Yellow | Adventurer's Guild, Harvey's Clinic |
-| 3 | **Corporate Access** | Orange | Joja Corp, Mayor's Office budget |
-| 4 | **Arcane Knowledge** | Purple | Wizard's Tower, Mr. Qi's paranormal logs |
-| 5 | **Junimo Script** | Red | Mayor's inner circle, Qi's X-Files — highest secrecy |
+| 0 | **TOWN NOTICE** | Gray | Town bulletin, festival announcements — visible to ALL |
+| 1 | **GUILD SEALED** | Green | Community center, carpenter's shop, pier & docks |
+| 2 | **COUNCIL SEALED** | Yellow | Adventurer's Guild, Harvey's Clinic |
+| 3 | **VAULT SEALED** | Orange | Directors, Joja Corp, Mayor's Office budget |
+| 4 | **ARCANE SEALED** | Purple | Wizard's Tower, Guildmaster, Qi's paranormal logs |
+| 5 | **JUNIMO SCRIPT** | Red | Mayor, Archmage — highest secrecy |
 
-### Departments (11 departments)
+### Departments (12 departments)
 
 | Department | Special Ability |
 |---|---|
 | **Mayor's Office** | Tier 4+ sees ALL records (oversight override) |
-| **Wizard's Tower** | Sees `arcane`-tagged records cross-department |
+| **Wizard's Tower** | Sees `arcane`-tagged records across departments |
 | **Mr. Qi's Office** | X-Files investigations, secret notes, paranormal tracking |
 | **Adventurer's Guild** | Mine safety, monster reports, expeditions |
 | **Harvey's Clinic** | Medical records, health services |
@@ -65,75 +65,86 @@ Every scroll belongs to a **department**. Every villager works for a **departmen
 | **Community Center** | Bundles, festivals, forest spirit logs |
 | **Carpenter's Shop** | Building permits, infrastructure, shortcuts |
 | **Pier & Docks** | Legendary fish catalog, fishing competitions |
-| **Museum / Library** | Artifacts, lost books, public archives |
+| **Museum** | Artifacts, lost books, public archives |
 | **Bulletin Board** | Public notices, festival announcements |
+| **Roving Trader** | Caravan merchant, unaffiliated scrolls |
 
-### System Roles (4 permission levels)
+### Roles (per department)
 
-| Role | Create Scrolls | Manage Villagers | View Ledger | Default Tier |
-|---|---|---|---|---|
-| `mayor` | Yes (any department) | Yes | Yes | 5 |
-| `keeper` | Yes (own department) | No | No | 4 |
-| `villager` | No | No | No | 1 |
-| `associate` | No | No | No | 0 |
+Each department has 6 roles — 3 universal + 3 department-specific:
 
-## Seed Data — 14 Villagers & 46 Scrolls
-
-### Villagers
-
-| Username | Password | Department | Tier | Role |
-|---|---|---|---|---|
-| `lewis` | `mayor123` | Mayor's Office | 5 | mayor |
-| `marnie` | `deputy123` | Mayor's Office | 4 | mayor |
-| `qi` | `qichallenge` | Mr. Qi's Office | 5 | keeper |
-| `rasmodius` | `wizard123` | Wizard's Tower | 4 | keeper |
-| `morris` | `joja123` | Joja Corp | 3 | keeper |
-| `marlon` | `guild123` | Adventurer's Guild | 2 | keeper |
-| `gil` | `guild123` | Adventurer's Guild | 1 | villager |
-| `harvey` | `clinic123` | Harvey's Clinic | 2 | keeper |
-| `junimo` | `bundle123` | Community Center | 1 | villager |
-| `robin` | `build123` | Carpenter's Shop | 1 | villager |
-| `willy` | `fishmaster` | Pier & Docks | 1 | villager |
-| `gunther` | `museum123` | Museum | 0 | associate |
-| `gus` | `saloon123` | Bulletin Board | 0 | associate |
-| `krobus` | `voidshadow` | Pier & Docks | 0 | associate |
-
-### Scroll Folders
-
-- **War of the Worlds Broadcast** — Emergency broadcast of a fictional Gotoro invasion that caused town-wide panic, followed by a retraction. 47 villagers hid in the Community Center basement.
-- **X-Files: Qi's Investigations** (5 scrolls) — Strange Capsule follow-up, Prismatic Entity observations, Grandpa's temporal anomaly, Wizard's identity investigation, weekly paranormal activity log
-- **Secret Notes** (3 scrolls) — Solid Gold Lewis statue, Maple Syrup Bear, Qi Challenge
-- **The Legendary Fish** (3 scrolls) — Legend (Mountain Lake), Glacierfish, Crimsonfish
-
-### Easter Eggs
-
-- Void Chicken origin study (Krobus shadow dimension testimony)
-- Statue of Endless Fortune produced a gold coin from **year 2319**
-- Mermaid's song at the Night Market is actually coded fishing coordinates
-- Iridium Seam legal dispute between Joja Corp and Adventurer's Guild
-- Grange Display contest: Morris tried entering Joja Cola cans, pyramid collapsed
-- Ice Fishing competition: Pam fished while drinking Pale Ale, Lewis caught a driftwood splinter
-
-### Access Scenarios (for presentation)
-
-| Villager | Tries to read... | Result |
+| Universal Roles | Clearance | Capabilities |
 |---|---|---|
-| `lewis` (Mayor, t5) | Any scroll in any department | ✅ Mayor override — sees all 46 |
-| `marnie` (Mayor, t4) | Any scroll in any department | ✅ Mayor override — sees all 46 |
-| `marlon` (Guild, t2) | Mine Monster Report (Guild, t2) | ✅ Same department, sufficient tier |
-| `marlon` (Guild, t2) | Medical Record (Clinic, t2) | ❌ Wrong department |
-| `marlon` (Guild, t2) | Skull Cavern Expedition (Guild, t2) | ✅ Same department, sufficient tier |
-| `gil` (Guild, t1) | Skull Cavern Expedition (Guild, t2) | ❌ Insufficient tier within department |
-| `rasmodius` (Wizard, t4) | Shadow Brute Census (Guild, t1, tagged `arcane`) | ✅ Arcane bypass |
-| `rasmodius` (Wizard, t4) | Joja Expansion Plan (Joja, t3) | ❌ Wrong department, no arcane tag |
-| `qi` (Qi, t5) | X-Files scrolls (Qi's Office, t4–5) | ✅ Same department |
-| `qi` (Qi, t5) | Town Budget (Mayor's Office, t3) | ❌ Wrong department — Qi's Office cannot see Mayor's Office scrolls |
-| `willy` (Pier, t1) | Legendary Fish catalog (Pier, t1) | ✅ Same department |
-| `willy` (Pier, t1) | Void Chicken Study (Clinic, t2) | ❌ Wrong department |
-| `krobus` (Pier, t0) | Legendary Fish catalog (Pier, t1) | ❌ Same department but insufficient tier |
-| `krobus` (Pier, t0) | Ice Fishing Results (Pier, t0) | ✅ Public tier 0 |
-| `gunther` (Museum, t0) | Lost Books Recovery (Museum, t0) | ✅ Public tier 0 |
-| `gunther` (Museum, t0) | Bundle Progress (Community, t1) | ❌ Wrong department, tier > 0 |
+| **Director** | VAULT SEALED (3) | Create, edit, archive scrolls. Manage department members |
+| **Member** | COUNCIL SEALED (2) | Read department scrolls at tier ≤2, create drafts |
+| **Visitor** | TOWN NOTICE (0) | Read public scrolls only |
+
+Departments have unique themed roles: Mayor, Archmage, Doctor, Guildmaster, Curator, Agent, Harbormaster, etc.
+
+## Workflow Engine
+
+Scrolls follow a state machine lifecycle with role-gated transitions:
+
+```
+draft → review → frozen → archived → public
+  ↑        ↑         ↑          ↑         ↑
+  └────────┴─────────┴──────────┴─────────┘  (Mayor revert)
+```
+
+| Transition | Required Role |
+|---|---|
+| draft → review | Director or Mayor |
+| review → frozen | Mayor only |
+| frozen → archived | Director or Mayor |
+| archived → public | Mayor only |
+| any → draft (revert) | Mayor only |
+
+**Frozen** scrolls have their SHA-256 content hash computed and stored. On every view, the hash is verified — any mismatch shows `⚠ TAMPERING DETECTED`.
+
+## Scroll Freezing & Integrity
+
+- SHA-256 hash of title + content + tier + department + tags
+- Frozen status locks content; hash stored in `content_hash`
+- Every view recomputes and compares hash
+- Direct DB modification is detected in real-time
+
+## Vault Encryption (AES-256-GCM)
+
+- All scroll content encrypted at rest in SQLite
+- Master key derived via PBKDF2 from `VAULT_KEY` env var + static salt
+- Per-document random nonce (IV); format: `base64(nonce + ciphertext + tag)`
+- Transparent encrypt on write, decrypt on read in service layer
+
+## Security Features
+
+- **Account Lockout**: 5 failed logins from same IP → 15-minute lockout with countdown
+- **Password Policy**: 8+ chars, letters + numbers/symbols, blocked common passwords
+- **Session Warning**: "Session expires in N minutes" banner at TTL-5min, auto-refresh on activity
+- **Password Change**: In-TUI password change with current password verification
+- **Login Rate Limiting**: 5 req/min per IP on `/auth/login`, returns 429 with `Retry-After`
+
+## Data Structures (Custom, Hand-Rolled)
+
+| Structure | Use Case | Complexity |
+|---|---|---|
+| **AVL Tree** | Scroll index by access tier | Insert: O(log n), Query: O(log n + k) |
+| **HashMap** | Session token cache | Get/Set: O(1) average |
+| **Doubly Linked List** | Town ledger buffer | Append: O(1), LastN: O(n) |
+| **LRU Cache** | Recently viewed scrolls (per-user, TTL eviction) | Get/Put: O(1), Eviction: O(1) |
+| **Trie** | Search autocomplete from scroll titles | Search: O(k) for prefix length k |
+| **Max Heap** | Featured scrolls by importance score | ExtractMax: O(log n), Insert: O(log n) |
+
+## TUI Features
+
+- **6 themes**: Gruvbox Dark, Catppuccin Mocha, Nord, Tokyo Night, Stardew Warm, Vault Classic
+- **Breadcrumb navigation**: `Dashboard > Scrolls > Scroll Title` trail
+- **Markdown rendering**: Scroll content rendered via glamour
+- **ASCII bar charts**: Scroll distribution by tier on dashboard
+- **FTS5 content search**: Full-text search across titles and content (Ctrl+F)
+- **Server-side pagination**: Catalog browsing with LIMIT/OFFSET
+- **Export to file**: Save scrolls as `.md` to `./exports/` directory
+- **Stats dashboard**: Tier counts, department distribution, most active scribe, monthly totals
+- **Recently viewed**: Per-user LRU cache tracks last viewed scrolls
 
 ## API Endpoints
 
@@ -142,19 +153,30 @@ Every scroll belongs to a **department**. Every villager works for a **departmen
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/health` | JSON health check (DB, uptime, memory) |
-| `POST` | `/auth/login` | Sign in, returns session token |
+| `POST` | `/auth/login` | Sign in, returns session token (rate limited: 5/min) |
+| `POST` | `/auth/logout` | Sign out |
+| `POST` | `/auth/register` | Register new villager |
 
 ### Authenticated (Bearer token required)
 
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/me` | Current villager info |
-| `GET` | `/api/documents` | List accessible scrolls (department + tier filtered) |
+| `PUT` | `/api/me/refresh` | Extend session TTL |
+| `PUT` | `/api/me/password` | Change password (current + new + confirm) |
+| `GET` | `/api/me/recent` | Recently viewed scrolls (LRU cache) |
+| `GET` | `/api/documents` | List accessible scrolls (tier + department filtered) |
+| `GET` | `/api/documents/search?q=...` | FTS5 full-text search across titles + content |
+| `GET` | `/api/documents/autocomplete?q=...` | Trie-based prefix search on titles |
+| `GET` | `/api/documents/featured` | Top 5 featured scrolls by importance score (max heap) |
 | `GET` | `/api/documents/{id}` | Get scroll (403 if sealed) |
-| `POST` | `/api/documents` | Scribe new scroll (keeper+) |
-| `PUT` | `/api/documents/{id}` | Amend scroll (keeper+) |
-| `DELETE` | `/api/documents/{id}` | Destroy scroll (mayor only) |
-| `GET` | `/api/catalog` | All metadata (titles, tiers, departments — no content) |
+| `GET` | `/api/documents/{id}/export` | Export scroll as Markdown file |
+| `GET` | `/api/catalog?limit=&offset=` | Paginated metadata (titles, tiers, departments) |
+| `GET` | `/api/stats` | Document statistics (tier counts, dept counts, trends) |
+| `POST` | `/api/documents` | Scribe new scroll (Director or Mayor) |
+| `PUT` | `/api/documents/{id}` | Amend scroll (Director or Mayor) |
+| `PUT` | `/api/documents/{id}/transition` | Advance workflow state |
+| `DELETE` | `/api/documents/{id}` | Destroy scroll (Mayor only) |
 
 ### Mayor only
 
@@ -164,7 +186,7 @@ Every scroll belongs to a **department**. Every villager works for a **departmen
 | `POST` | `/api/users` | Register new villager |
 | `PUT` | `/api/users/{id}` | Update villager |
 | `DELETE` | `/api/users/{id}` | Dismiss villager |
-| `GET` | `/api/audit` | View town ledger |
+| `GET` | `/api/audit?limit=&offset=` | Paginated town ledger |
 
 ### Dev only
 
@@ -173,86 +195,71 @@ Every scroll belongs to a **department**. Every villager works for a **departmen
 | `GET` | `/docs/` | Swagger API docs |
 | `GET` | `/debug/pprof/` | Go profiler |
 
-## Makefile Commands
-
-```bash
-make dev           # Hot-reload with Air
-make build         # Build server
-make build-client  # Build TUI client
-make run           # Build & run server
-make test          # Run unit tests
-make smoke         # Run curl smoke tests
-make seed          # Populate with demo data
-make build-exe     # Cross-compile server for Windows
-make build-release # All binaries, all platforms
-make clean         # Remove binaries and DB
-```
-
-## Deploy
-
-### Render
-
-Push to GitHub, connect repo in Render dashboard → "Blueprints". It reads `render.yaml` — builds via Docker, mounts a 1GB disk for SQLite, and sets up HTTPS automatically.
-
-```bash
-# Manual deploy via Docker
-docker build -t pelican-town-archives .
-docker run -p 8080:8080 -v $(pwd)/data:/data pelican-town-archives
-```
-
-Secrets to configure in dashboard:
-- `JWT_SECRET` (required for session security)
-- `INITIAL_MAYOR_PASSWORD` (default: `mayor123`)
-
 ## Project Structure
 
 ```
 ├── cmd/
-│   ├── server/        # Backend entrypoint
-│   ├── client/        # TUI entrypoint
-│   └── seed/          # Database seeder (14 villagers + 46 scrolls)
+│   ├── client/main.go          # TUI client entrypoint
+│   ├── seed/main.go            # Database seeder (14 villagers, 46+ scrolls)
+│   └── server/
+│       ├── main.go             # Server entrypoint + route registry
+│       ├── middleware.go       # Middleware chain + logger setup
+│       └── health.go           # Health check endpoint
+├── config/config.go            # Environment configuration
 ├── internal/
-│   ├── domain/        # Entities (Villager, Scroll, AuditLog)
-│   │   ├── user.go
-│   │   ├── document.go
-│   │   ├── audit.go
-│   │   └── clearance.go   # Tiers, Roles, Departments
-│   ├── ds/            # Hand-written data structures
-│   │   ├── avl_tree.go
-│   │   ├── hash_map.go
-│   │   └── linked_list.go
-│   ├── auth/          # Token + bcrypt + session
-│   ├── middleware/     # HTTP middleware (auth, cors, logger)
-│   ├── repository/    # SQLite CRUD
-│   ├── service/       # Business logic (department-scoped access control)
-│   ├── handler/       # HTTP handlers
-│   ├── validate/      # Input validation
-│   └── apperr/        # Structured errors
+│   ├── apperr/apperr.go        # Typed application errors
+│   ├── auth/                   # Token generation, bcrypt, session types
+│   ├── crypto/vault.go         # AES-256-GCM encryption/decryption
+│   ├── domain/                 # Models: User, Document, Clearance, Audit, Workflow
+│   ├── ds/                     # Custom data structures
+│   │   ├── avl_tree.go         # Thread-safe AVL tree for clearance index
+│   │   ├── hash_map.go         # Generic chaining hash map for sessions
+│   │   ├── linked_list.go      # Doubly-linked list for audit buffer
+│   │   ├── lru_cache.go        # LRU cache with TTL for recently viewed
+│   │   ├── trie.go             # Prefix trie for search autocomplete
+│   │   └── heap.go             # Max heap for featured scroll scoring
+│   ├── handler/                # HTTP handlers (auth, docs, users, audit, stats)
+│   ├── middleware/              # Auth, CORS, logging, rate limiting, recovery
+│   ├── repository/             # SQLite data access layer
+│   ├── service/                # Business logic, access control, encryption
+│   └── validate/               # Input validation (password, username, docs)
+├── migrations/                 # SQLite schema migrations (001-009)
 ├── tui/
-│   ├── app.go         # Bubble Tea root model
-│   ├── client/        # HTTP API client
-│   ├── screens/       # UI screens (Gruvbox Material Dark Hard palette)
-│   └── styles/        # Lip Gloss styles + department/tier badges
-├── migrations/        # SQL schema files
-├── scripts/           # Smoke test script
+│   ├── app.go                  # Main Bubble Tea model + screen router
+│   ├── client/                 # HTTP API client for TUI
+│   └── screens/                # UI screens (login, dashboard, docs, users, etc.)
+│   ├── styles/styles.go        # Lipgloss styles + clearance/department badges
+│   └── themes/themes.go        # 6 color themes
 ├── Dockerfile
-├── render.yaml
-└── Makefile
+├── Makefile
+└── render.yaml                 # Render.com deployment config
 ```
-
-## Data Structures (Hand-rolled)
-
-| Structure | Use Case | Complexity |
-|---|---|---|
-| AVL Tree | Scroll index by access tier | Insert: O(log n), Query: O(log n + k) |
-| HashMap | Session token cache | Get/Set: O(1) average |
-| Doubly Linked List | Town ledger buffer | Append: O(1), LastN: O(n) |
 
 ## Tech Stack
 
 - **Backend**: Go 1.22+ `net/http` (stdlib routing with path params)
-- **Database**: SQLite via `modernc.org/sqlite` (pure Go, no CGO)
-- **TUI**: Bubble Tea + Lip Gloss + Bubbles — Gruvbox Material Dark Hard palette
+- **Database**: SQLite via `modernc.org/sqlite` (pure Go, no CGO, WAL mode, FTS5)
+- **Encryption**: AES-256-GCM via `crypto/aes` + `crypto/cipher`, PBKDF2 key derivation
+- **TUI**: Bubble Tea + Lip Gloss + Bubbles + Glamour Markdown
 - **Logging**: stdlib `log/slog` (structured JSON in production)
 - **Docs**: Swagger via `swaggo/swag`
 - **Deploy**: Docker, Render
+
+## Deploy
+
+### Docker
+
+```bash
+docker build -t pelican-town-archives .
+docker run -p 8080:8080 -v $(pwd)/data:/data pelican-town-archives
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `VAULT_KEY` | `pelican-town-master-key` | AES-256 master encryption key |
+| `INITIAL_MAYOR_PASSWORD` | `mayor123` | Default mayor password on first run |
+| `SESSION_TTL` | `8h` | Session token expiry duration |
+| `PORT` | `8080` | HTTP server port |
+| `DATABASE_PATH` | `./vault.db` | SQLite database file path |

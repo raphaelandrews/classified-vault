@@ -13,10 +13,11 @@ import (
 )
 
 type APIClient struct {
-	baseURL string
-	client  *http.Client
-	Token   string
-	User    *domain.User
+	baseURL          string
+	client           *http.Client
+	Token            string
+	User             *domain.User
+	SessionExpiresAt time.Time
 }
 
 func New(baseURL string) *APIClient {
@@ -27,6 +28,10 @@ func New(baseURL string) *APIClient {
 }
 
 func (c *APIClient) do(method, path string, body interface{}) (*http.Response, []byte, error) {
+	return c.doRequest(method, path, body)
+}
+
+func (c *APIClient) doRequest(method, path string, body interface{}) (*http.Response, []byte, error) {
 	url := c.baseURL + path
 
 	var reqBody io.Reader
@@ -59,6 +64,21 @@ func (c *APIClient) do(method, path string, body interface{}) (*http.Response, [
 		return nil, nil, fmt.Errorf("read response: %w", err)
 	}
 
+	if expiresStr := resp.Header.Get("X-Session-Expires"); expiresStr != "" {
+		if t, err := time.Parse(time.RFC3339, expiresStr); err == nil {
+			c.SessionExpiresAt = t
+		}
+	}
+
+	if resp.StatusCode == 429 {
+		retryAfter := resp.Header.Get("Retry-After")
+		msg := "too many login attempts"
+		if retryAfter != "" {
+			msg = fmt.Sprintf("too many login attempts, wait %s seconds", retryAfter)
+		}
+		return resp, nil, fmt.Errorf("%s", msg)
+	}
+
 	if resp.StatusCode >= 400 {
 		var apiErr map[string]string
 		json.Unmarshal(respBody, &apiErr)
@@ -66,7 +86,7 @@ func (c *APIClient) do(method, path string, body interface{}) (*http.Response, [
 		if msg == "" {
 			msg = fmt.Sprintf("request failed (status %d)", resp.StatusCode)
 		}
-		return nil, nil, fmt.Errorf("%s", msg)
+		return resp, nil, fmt.Errorf("%s", msg)
 	}
 
 	return resp, respBody, nil

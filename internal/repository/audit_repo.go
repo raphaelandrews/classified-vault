@@ -25,10 +25,10 @@ func (r *AuditRepository) Save(log *domain.AuditLog) error {
 	return err
 }
 
-func (r *AuditRepository) FindAll(limit int) ([]*domain.AuditLog, error) {
+func (r *AuditRepository) FindAll(limit, offset int) ([]*domain.AuditLog, error) {
 	rows, err := r.db.Query(
 		`SELECT id, user_id, username, action, resource, ip_address, success, details, timestamp
-		 FROM audit_logs ORDER BY timestamp DESC LIMIT ?`, limit,
+		 FROM audit_logs ORDER BY timestamp DESC LIMIT ? OFFSET ?`, limit, offset,
 	)
 	if err != nil {
 		return nil, err
@@ -46,10 +46,16 @@ func (r *AuditRepository) FindAll(limit int) ([]*domain.AuditLog, error) {
 	return logs, rows.Err()
 }
 
-func (r *AuditRepository) FindByUser(userID string, limit int) ([]*domain.AuditLog, error) {
+func (r *AuditRepository) Count() (int, error) {
+	var count int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM audit_logs`).Scan(&count)
+	return count, err
+}
+
+func (r *AuditRepository) FindByUser(userID string, limit, offset int) ([]*domain.AuditLog, error) {
 	rows, err := r.db.Query(
 		`SELECT id, user_id, username, action, resource, ip_address, success, details, timestamp
-		 FROM audit_logs WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?`, userID, limit,
+		 FROM audit_logs WHERE user_id = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?`, userID, limit, offset,
 	)
 	if err != nil {
 		return nil, err

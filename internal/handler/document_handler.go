@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"classified-vault/internal/auth"
 	"classified-vault/internal/domain"
@@ -16,7 +17,19 @@ type DocumentService interface {
 	Update(session auth.Session, id string, doc *domain.Document) (*domain.Document, error)
 	Delete(session auth.Session, id string) error
 	Transition(session auth.Session, id string, to domain.DocumentStatus) (*domain.Document, error)
-	Catalog() ([]repository.DocMetadata, error)
+	Catalog(limit, offset int) ([]repository.DocMetadata, error)
+	CountDocuments() (int, error)
+	Search(query string, session auth.Session) ([]repository.DocMetadata, error)
+	ExportToMarkdown(doc *domain.Document) (string, error)
+	RecentlyViewed(userID string) []string
+	TrieSearch(prefix string) []struct {
+		Word  string
+		DocID string
+	}
+	FeaturedScrolls(n int) []struct {
+		DocID string
+		Score int
+	}
 }
 
 type DocumentHandler struct {
@@ -165,11 +178,108 @@ func (h *DocumentHandler) Catalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	docs, err := h.service.Catalog()
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	if limit <= 0 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	docs, err := h.service.Catalog(limit, offset)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list catalog"})
 		return
 	}
 
+	total, err := h.service.CountDocuments()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to count documents"})
+		return
+	}
+
+	w.Header().Set("X-Total-Count", strconv.Itoa(total))
 	writeJSON(w, http.StatusOK, docs)
+}
+
+func (h *DocumentHandler) Search(w http.ResponseWriter, r *http.Request) {
+	session := requireSession(w, r)
+	if session == nil {
+		return
+	}
+
+	q := r.URL.Query().Get("q")
+	if q == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "query parameter 'q' required"})
+		return
+	}
+
+	docs, err := h.service.Search(q, *session)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "search failed"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, docs)
+}
+
+func (h *DocumentHandler) Export(w http.ResponseWriter, r *http.Request) {
+	session := requireSession(w, r)
+	if session == nil {
+		return
+	}
+
+	id := r.PathValue("id")
+	doc, err := h.service.GetByID(*session, id)
+	if err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "access denied or not found"})
+		return
+	}
+
+	md, err := h.service.ExportToMarkdown(doc)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "export failed"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+doc.Title+".md\"")
+	w.Write([]byte(md))
+}
+
+func (h *DocumentHandler) Autocomplete(w http.ResponseWriter, r *http.Request) {
+	session := requireSession(w, r)
+	if session == nil {
+		return
+	}
+
+	q := r.URL.Query().Get("q")
+	matching := h.service.TrieSearch(q)
+	writeJSON(w, http.StatusOK, matching)
+}
+
+func (h *DocumentHandler) Featured(w http.ResponseWriter, r *http.Request) {
+	session := requireSession(w, r)
+	if session == nil {
+		return
+	}
+
+	featured := h.service.FeaturedScrolls(5)
+	writeJSON(w, http.StatusOK, featured)
+}
+
+func (h *DocumentHandler) Recent(w http.ResponseWriter, r *http.Request) {
+	session := requireSession(w, r)
+	if session == nil {
+		return
+	}
+
+	docIDs := h.service.RecentlyViewed(session.UserID)
+	if docIDs == nil {
+		docIDs = []string{}
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"document_ids": docIDs,
+	})
 }

@@ -2,6 +2,8 @@ package screens
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -10,22 +12,33 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"classified-vault/internal/domain"
+	"classified-vault/tui/client"
 	"classified-vault/tui/styles"
 )
 
 type DocumentViewModel struct {
-	doc      *domain.Document
-	user     *domain.User
-	width    int
-	height   int
-	viewport viewport.Model
-	ready    bool
+	doc          *domain.Document
+	user         *domain.User
+	apiClient    *client.APIClient
+	width        int
+	height       int
+	viewport     viewport.Model
+	ready        bool
+	exportStatus string
 }
 
 func NewDocumentViewModel(doc *domain.Document, user *domain.User) DocumentViewModel {
 	return DocumentViewModel{
 		doc:  doc,
 		user: user,
+	}
+}
+
+func NewDocumentViewModelWithClient(doc *domain.Document, user *domain.User, api *client.APIClient) DocumentViewModel {
+	return DocumentViewModel{
+		doc:       doc,
+		user:      user,
+		apiClient: api,
 	}
 }
 
@@ -118,9 +131,15 @@ func (m *DocumentViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch strings.ToUpper(msg.String()) {
 		case "H", "Q":
 			return m, func() tea.Msg { return NavigateMsg{Screen: ScreenDocList} }
+		case "X":
+			return m, m.exportDoc
 		case "CTRL+C":
 			return m, tea.Quit
 		}
+
+	case exportResultMsg:
+		m.exportStatus = string(msg)
+		return m, nil
 	}
 
 	m.viewport, cmd = m.viewport.Update(msg)
@@ -128,8 +147,36 @@ func (m *DocumentViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *DocumentViewModel) View() string {
-	footer := styles.StatusBarStyle.Width(m.width).Render("[↑/↓] Scroll  [h] Back  [q] Quit  [?] Help")
-	return m.viewport.View() + "\n" + footer
+	var sb strings.Builder
+	if m.exportStatus != "" {
+		sb.WriteString(styles.SuccessStyle.Render(m.exportStatus) + "\n")
+	}
+	sb.WriteString(m.viewport.View())
+	footer := styles.StatusBarStyle.Width(m.width).Render("[↑/↓] Scroll  [x] Export  [h] Back  [q] Quit  [?] Help")
+	return sb.String() + "\n" + footer
+}
+
+type exportResultMsg string
+
+func (m *DocumentViewModel) exportDoc() tea.Msg {
+	md, err := m.apiClient.ExportDocument(m.doc.ID)
+	if err != nil {
+		return exportResultMsg("Export failed: " + err.Error())
+	}
+
+	dir := "exports"
+	os.MkdirAll(dir, 0755)
+	safeName := strings.Map(func(r rune) rune {
+		if r == '/' || r == '\\' || r == ':' {
+			return '_'
+		}
+		return r
+	}, m.doc.Title)
+	path := filepath.Join(dir, safeName+".md")
+	if err := os.WriteFile(path, []byte(md), 0644); err != nil {
+		return exportResultMsg("Export save failed: " + err.Error())
+	}
+	return exportResultMsg(fmt.Sprintf("Exported to %s", path))
 }
 
 func statusBadge(s domain.DocumentStatus) string {

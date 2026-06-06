@@ -2,12 +2,17 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
+	"time"
 
 	"classified-vault/internal/auth"
 	"classified-vault/internal/domain"
 	"classified-vault/internal/ds"
 	"classified-vault/internal/middleware"
+	"classified-vault/internal/service"
+	"classified-vault/internal/validate"
 )
 
 type AuthService interface {
@@ -15,6 +20,9 @@ type AuthService interface {
 	Logout(token string) error
 	GetSession(token string) (*auth.Session, error)
 	Register(username, password string, department domain.Department) (*domain.User, error)
+	RefreshSession(token string) error
+	ChangePassword(userID, currentPassword, newPassword string) error
+	GetLockoutRemaining(ip string) time.Duration
 }
 
 type AuthHandler struct {
@@ -49,6 +57,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	session, token, user, err := h.service.Login(req.Username, req.Password, r.RemoteAddr)
 	if err != nil {
+		var lockoutErr *service.LockoutError
+		if errors.As(err, &lockoutErr) {
+			writeJSON(w, http.StatusTooManyRequests, map[string]string{
+				"error":       lockoutErr.Error(),
+				"retry_after": fmt.Sprintf("%d", int(lockoutErr.Duration.Seconds())),
+			})
+			return
+		}
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid credentials"})
 		return
 	}
@@ -110,6 +126,16 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := validate.Password(req.Password); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	if err := validate.Username(req.Username); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
 	user, err := h.service.Register(req.Username, req.Password, domain.Department(req.Department))
 	if err != nil {
 		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
@@ -117,6 +143,50 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, user)
+}
+
+func (h *AuthHandler) RefreshSession(w http.ResponseWriter, r *http.Request) {
+	token := middleware.TokenFromContext(r.Context())
+	if token == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing token"})
+		return
+	}
+
+	if err := h.service.RefreshSession(token); err != nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "session refresh failed"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "session refreshed"})
+}
+
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	session := middleware.SessionFromContext(r.Context())
+	if session == nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+
+	var req struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	if req.CurrentPassword == "" || req.NewPassword == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "current and new password required"})
+		return
+	}
+
+	if err := h.service.ChangePassword(session.UserID, req.CurrentPassword, req.NewPassword); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "password changed"})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

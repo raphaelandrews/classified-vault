@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,6 +20,8 @@ type DocumentService struct {
 	index       *ds.AVLTree
 	auditBuffer *ds.LinkedList[domain.AuditLog]
 	auditRepo   *repository.AuditRepository
+	lruCache    *ds.LRUCache
+	trie        *ds.Trie
 }
 
 func NewDocumentService(
@@ -26,12 +29,16 @@ func NewDocumentService(
 	index *ds.AVLTree,
 	auditBuffer *ds.LinkedList[domain.AuditLog],
 	auditRepo *repository.AuditRepository,
+	lruCache *ds.LRUCache,
+	trie *ds.Trie,
 ) *DocumentService {
 	return &DocumentService{
 		repo:        repo,
 		index:       index,
 		auditBuffer: auditBuffer,
 		auditRepo:   auditRepo,
+		lruCache:    lruCache,
+		trie:        trie,
 	}
 }
 
@@ -82,6 +89,8 @@ func (s *DocumentService) GetByID(session auth.Session, docID string) (*domain.D
 	}
 
 	doc.Content = decryptContent(doc.Content)
+
+	s.lruCache.Put(session.UserID+":"+docID, docID)
 
 	s.logAudit(domain.AuditLog{
 		UserID:   session.UserID,
@@ -252,8 +261,95 @@ func (s *DocumentService) Delete(session auth.Session, id string) error {
 	return nil
 }
 
-func (s *DocumentService) Catalog() ([]repository.DocMetadata, error) {
-	return s.repo.FindAllMetadata()
+func (s *DocumentService) Catalog(limit, offset int) ([]repository.DocMetadata, error) {
+	return s.repo.FindAllMetadata(limit, offset)
+}
+
+func (s *DocumentService) CountDocuments() (int, error) {
+	return s.repo.Count()
+}
+
+func (s *DocumentService) Search(query string, session auth.Session) ([]repository.DocMetadata, error) {
+	return s.repo.SearchContent(query)
+}
+
+func (s *DocumentService) ExportToMarkdown(doc *domain.Document) (string, error) {
+	var sb strings.Builder
+
+	sb.WriteString("---\n")
+	sb.WriteString("title: " + doc.Title + "\n")
+	sb.WriteString("id: " + doc.ID + "\n")
+	sb.WriteString("tier: " + doc.Classification.String() + "\n")
+	sb.WriteString("status: " + string(doc.Status) + "\n")
+	sb.WriteString("department: " + string(doc.Department) + "\n")
+	if doc.Folder != "" {
+		sb.WriteString("folder: " + doc.Folder + "\n")
+	}
+	sb.WriteString("created_by: " + doc.CreatedBy + "\n")
+	sb.WriteString("created_at: " + doc.CreatedAt.Format(time.RFC3339) + "\n")
+	sb.WriteString("updated_at: " + doc.UpdatedAt.Format(time.RFC3339) + "\n")
+	if len(doc.Tags) > 0 {
+		sb.WriteString("tags: [" + strings.Join(doc.Tags, ", ") + "]\n")
+	}
+	sb.WriteString("---\n\n")
+	sb.WriteString(doc.Content)
+	sb.WriteString("\n")
+
+	return sb.String(), nil
+}
+
+func (s *DocumentService) RecentlyViewed(userID string) []string {
+	allKeys := s.lruCache.Keys()
+	prefix := userID + ":"
+	var docIDs []string
+	for i := len(allKeys) - 1; i >= 0; i-- {
+		if strings.HasPrefix(allKeys[i], prefix) {
+			if id, ok := s.lruCache.Get(allKeys[i]); ok {
+				if idStr, ok2 := id.(string); ok2 {
+					docIDs = append(docIDs, idStr)
+				}
+			}
+		}
+	}
+	return docIDs
+}
+
+func (s *DocumentService) FeaturedScrolls(n int) []struct {
+	DocID string
+	Score int
+} {
+	allDocs, err := s.repo.FindAll()
+	if err != nil {
+		return nil
+	}
+
+	heap := ds.NewMaxHeap()
+	now := time.Now()
+	for _, doc := range allDocs {
+		recency := int(now.Sub(doc.CreatedAt).Hours() / 24)
+		score := int(doc.Classification)*10 + recency
+		heap.Insert(doc.ID, score)
+	}
+
+	return heap.TopN(n)
+}
+
+func (s *DocumentService) RebuildTrie() {
+	allDocs, err := s.repo.FindAll()
+	if err != nil {
+		return
+	}
+	s.trie.Clear()
+	for _, doc := range allDocs {
+		s.trie.Insert(doc.Title, doc.ID)
+	}
+}
+
+func (s *DocumentService) TrieSearch(prefix string) []struct {
+	Word  string
+	DocID string
+} {
+	return s.trie.SearchWithIDs(prefix)
 }
 
 func encryptContent(content string) string {

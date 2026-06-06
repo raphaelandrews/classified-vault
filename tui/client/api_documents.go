@@ -100,7 +100,11 @@ type CatalogEntry struct {
 }
 
 func (c *APIClient) ListCatalog() ([]CatalogEntry, error) {
-	_, body, err := c.do("GET", "/api/catalog", nil)
+	return c.ListCatalogPage(1000, 0)
+}
+
+func (c *APIClient) ListCatalogPage(limit, offset int) ([]CatalogEntry, error) {
+	_, body, err := c.do("GET", fmt.Sprintf("/api/catalog?limit=%d&offset=%d", limit, offset), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -109,4 +113,61 @@ func (c *APIClient) ListCatalog() ([]CatalogEntry, error) {
 		return nil, fmt.Errorf("unmarshal catalog: %w", err)
 	}
 	return entries, nil
+}
+
+func (c *APIClient) CountDocuments() (int, error) {
+	resp, _, err := c.do("GET", "/api/catalog?limit=1&offset=0", nil)
+	if err != nil {
+		return 0, err
+	}
+	total := resp.Header.Get("X-Total-Count")
+	if total == "" {
+		return 0, nil
+	}
+	var count int
+	fmt.Sscanf(total, "%d", &count)
+	return count, nil
+}
+
+func (c *APIClient) SearchDocuments(query string) ([]CatalogEntry, error) {
+	_, body, err := c.do("GET", "/api/documents/search?q="+query, nil)
+	if err != nil {
+		return nil, err
+	}
+	var entries []CatalogEntry
+	if err := json.Unmarshal(body, &entries); err != nil {
+		return nil, fmt.Errorf("unmarshal search results: %w", err)
+	}
+	return entries, nil
+}
+
+func (c *APIClient) ExportDocument(id string) (string, error) {
+	resp, body, err := c.do("GET", "/api/documents/"+id+"/export?format=md", nil)
+	if err != nil {
+		return "", err
+	}
+	_ = resp
+	return string(body), nil
+}
+
+type StatsResponse struct {
+	TierCounts       map[string]int `json:"tier_counts"`
+	DepartmentCounts map[string]int `json:"department_counts"`
+	MostActive       string         `json:"most_active"`
+	MostActiveCount  int            `json:"most_active_count"`
+	CreatedThisMonth int            `json:"created_this_month"`
+	TotalScrolls     int            `json:"total_scrolls"`
+	TotalVillagers   int            `json:"total_villagers"`
+}
+
+func (c *APIClient) GetStats() (*StatsResponse, error) {
+	_, body, err := c.do("GET", "/api/stats", nil)
+	if err != nil {
+		return nil, err
+	}
+	var stats StatsResponse
+	if err := json.Unmarshal(body, &stats); err != nil {
+		return nil, fmt.Errorf("unmarshal stats: %w", err)
+	}
+	return &stats, nil
 }
